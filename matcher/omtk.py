@@ -1,5 +1,6 @@
 from nonebot import on_command
 from nonebot.adapters.onebot.v11 import MessageEvent
+from nonebot.exception import FinishedException
 
 omtk = on_command("omtk")
 
@@ -19,20 +20,22 @@ async def handle_omtk(event: MessageEvent):
         cmd = event.get_plaintext().strip().split()
         match len(cmd):
             case 1:
-                omtk.finish(">osu!mania工具箱<\n发送/omtk显示此信息。发送/omtk <命令名>获取该命令的详细用法。\n\n简要介绍：\n 1.对一个osr文件回复并发送/pressingtime以分析按压时长\n 2.使用/rework以重算星数\n") # 基础帮助信息
+                await omtk.finish(">osu!mania工具箱<\n发送/omtk显示此信息。发送/omtk <命令名> [页码]获取该命令的详细用法。\n\n简要介绍：\n 1.对一个osr文件回复并发送/pressingtime以分析按压时长\n 2.使用/rework以重算星数\n") # 基础帮助信息
             case 2 | 3:
                 if len(cmd) == 2:
-                    cmd[2] = "1" # 默认页码为1
+                    cmd.append("1")  # 默认页码为1
                 for type, type_name, page, total_pages, text in help_text:
                     if cmd[1].lower() == type and cmd[2] == page:
                         if total_pages == "1":
-                            omtk.finish(type + "(" + type_name + "):\n" + text) # 详细帮助信息
-                        omtk.finish(type + "(" + type_name + "):\n" + text + " (第 " + page + " 页，共 " + total_pages + " 页)") # 分页详细帮助信息
-                omtk.finish("无效的命令类型或页码。")
+                            await omtk.finish(type + "(" + type_name + "):\n" + text) # 详细帮助信息
+                        await omtk.finish(type + "(" + type_name + "):\n" + text + "\n (第 " + page + " 页，共 " + total_pages + " 页)") # 分页详细帮助信息
+                await omtk.finish("无效的命令类型或页码。")
             case _:
-                omtk.finish("请检查命令格式后重试。")
+                await omtk.finish("请检查命令格式后重试。")
                 
     except ValueError:
-        omtk.finish("请检查命令格式后重试。")
+        await omtk.finish("请检查命令格式后重试。")
+    except FinishedException:
+        pass
     except Exception as e:
-        omtk.finish(f"发生错误: {str(e)}")
+        await omtk.finish(f"发生错误: {str(e)}")

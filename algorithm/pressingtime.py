@@ -169,6 +169,7 @@ def presssaver(file_path_without_ext: str, output_dir: str = None) -> str:
         return {"status": "NotMania", "img": None}
     
     onset = np.zeros(18) #infornation about previous key pressing
+    r_onset = np.zeros(18) #initialize r_onset to avoid UnboundLocalError
     timeset = np.zeros(18) #milisecond time that keyboard pressed
     pressset = [[] for i in range(18)] # save all data of timeset
     intervals = [] # save all data of time delta between frames
