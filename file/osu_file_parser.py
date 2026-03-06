@@ -1,6 +1,11 @@
 import numpy as np
 
-from ..algorithm.utils import string_to_int, collect_data
+def string_to_int(s):
+    return int(float(s))
+
+def collect_data(data, new_datum):
+    data.append(new_datum)
+
 
 class osu_file:
     def __init__(self, file_path):

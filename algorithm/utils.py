@@ -3,23 +3,6 @@ import numpy as np
 from ..file.osr_file_parser import osr_file
 from ..file.osu_file_parser import osu_file
 
-
-
-def findkey(x = 0):
-    keyset = [0 for i in range(18)]
-    (a, keyset[0]) = (x//2, x%2)
-    j = 1
-    while a != 0:
-        (a, keyset[j]) = (a//2, a%2)
-        j += 1
-    return np.array(keyset)
-
-def string_to_int(s):
-    return int(float(s))
-
-def collect_data(data, new_datum):
-    data.append(new_datum)
-
 def match_notes_and_presses(osu: osu_file, osr: osr_file):
     """
     匹配物件和按下事件，返回匹配的列表。

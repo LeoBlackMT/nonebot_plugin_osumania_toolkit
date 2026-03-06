@@ -5,7 +5,14 @@ from collections import Counter
 from osrparse import GameMode
 from osrparse import Mod
 
-from ..algorithm.utils import findkey
+def findkey(x = 0):
+    keyset = [0 for i in range(18)]
+    (a, keyset[0]) = (x//2, x%2)
+    j = 1
+    while a != 0:
+        (a, keyset[j]) = (a//2, a%2)
+        j += 1
+    return np.array(keyset)
 
 class osr_file:
     def __init__(self, file_path):
