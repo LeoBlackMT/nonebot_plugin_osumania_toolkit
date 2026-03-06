@@ -1,40 +1,47 @@
 import re
 import os
 import numpy as np
+import asyncio
 
 from matplotlib import pyplot as plt
 from matplotlib import colors
 from scipy.fft import fft, fftfreq
+from functools import partial
 
 from ..file.osr_file_parser import osr_file
 from ..file.osu_file_parser import osu_file
 
 from ..algorithm.utils import match_notes_and_presses
 
+async def run_plot_comprehensive(output_dir: str, osr_obj: osr_file, osu_obj: osu_file=None):
+    loop = asyncio.get_running_loop()
+    func = partial(plot_comprehensive, osr_obj, output_dir, osu_obj=osu_obj)
+    img_path = await loop.run_in_executor(None, func)
+    return img_path
 
-def plot_pressingtime(data: dict, output_dir: str) -> str:
+def plot_pressingtime(osr_obj: osr_file, output_dir: str) -> str:
     """
     绘制按压时长分布图（各轨道颜色区分）
     参数:
-        data: osr_file.get_data 返回的字典
+        osr_obj: osr_file 实例（已 process）
         output_dir: 输出目录
     返回:
         生成的图片路径
     """
-    pressset = data["pressset"]
-    mod = data["mod"]
-    player_name = data["player_name"]
-    timestamp = data["timestamp"]
-    file_basename = data["file_path"].with_suffix("")
-    acc = data["accuracy"]
-    ratio = data["ratio"]
-    score = data["score"]
-    gekis = data["judge"]["320"]
-    n300 = data["judge"]["300"]
-    katus = data["judge"]["200"]
-    n100 = data["judge"]["100"]
-    n50 = data["judge"]["50"]
-    misses = data["judge"]["0"]
+    pressset = osr_obj.pressset
+    mod = osr_obj.mod
+    player_name = osr_obj.player_name
+    timestamp = osr_obj.timestamp
+    file_basename = os.path.basename(osr_obj.file_path).replace('.osr', '')
+    acc = osr_obj.acc
+    ratio = osr_obj.ratio
+    score = osr_obj.score
+    gekis = osr_obj.judge["320"]
+    n300 = osr_obj.judge["300"]
+    katus = osr_obj.judge["200"]
+    n100 = osr_obj.judge["100"]
+    n50 = osr_obj.judge["50"]
+    misses = osr_obj.judge["0"]
 
     # 计算速度修正系数
     corrector = 1
@@ -127,19 +134,19 @@ def plot_delta(osr_obj: osr_file, osu_obj: osu_file, output_dir: str):
     plt.close()
     return output_path
 
-def plot_spectrum(data: dict, output_dir: str) -> str:
+def plot_spectrum(osr_obj: osr_file, output_dir: str) -> str:
     """
     生成脉冲序列频谱图
     参数:
-        data: presssaver 返回的字典
+        osr_obj: osr_file 实例（已 process）
         output_dir: 输出目录
     返回:
         生成的图片路径
     """
-    press_times = data["press_times"]
-    sample_rate = data["sample_rate"]
-    player_name = data["player_name"]
-    file_basename = data["file_basename"]
+    press_times = osr_obj.press_times
+    sample_rate = osr_obj.sample_rate
+    player_name = osr_obj.player_name
+    file_basename = os.path.basename(osr_obj.file_path).replace('.osr', '')
 
     if not press_times:
         raise ValueError("无按键事件，无法生成频谱图")

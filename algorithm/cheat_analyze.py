@@ -1,4 +1,5 @@
 import numpy as np
+import asyncio
 
 from scipy.fft import fft, fftfreq
 from collections import Counter
@@ -7,6 +8,17 @@ from scipy.signal import find_peaks
 from ..algorithm.utils import match_notes_and_presses
 from ..file.osr_file_parser import osr_file
 from ..file.osu_file_parser import osu_file
+
+async def run_analyze_cheating(osr_obj: osr_file, osu_obj: osu_file=None):
+    loop = asyncio.get_running_loop()
+    # 使用线程池执行同步函数
+    result = await loop.run_in_executor(
+        None,  # 使用默认线程池
+        analyze_cheating,
+        osu_obj,
+        osr_obj
+    )
+    return result
 
 def analyze_time_domain(data: dict) -> dict:
     '''
@@ -153,7 +165,6 @@ def analyze_delta_t(osr_obj: osr_file, osu_obj: osu_file):
         - cheat: bool
         - sus: bool
         - reason: str
-        - stats: dict 包含统计量
     """
     delta_list, matched_pairs = match_notes_and_presses(osu_obj, osr_obj)
 
@@ -336,8 +347,7 @@ def analyze_pulse_spectrum(data: dict) -> dict:
         "reason": reason
     }
     
-
-def analyze_cheating(osu: osu_file, osr: osr_file) -> dict:
+def analyze_cheating(osr: osr_file, osu: osu_file=None) -> dict:
     """
     综合分析作弊嫌疑
     参数:
@@ -352,7 +362,10 @@ def analyze_cheating(osu: osu_file, osr: osr_file) -> dict:
     # 时域分析
     time_result = analyze_time_domain(data)
     spectrum_result = analyze_pulse_spectrum(data)
-    delta_result = analyze_delta_t(osr, osu)
+    if osu:
+        delta_result = analyze_delta_t(osr, osu)
+    else:
+        delta_result = {"cheat": False, "sus": False, "reason": "未分析delta_t。"}
 
     cheat = time_result["cheat"] or spectrum_result["cheat"] or delta_result["cheat"]
     sus = time_result["sus"] or spectrum_result["sus"] or delta_result["sus"]

@@ -75,6 +75,7 @@ class osu_file:
             i += 1
         self.LN_ratio = self.get_LN_ratio()
         self.note_times = self.get_note_times()
+        self.status = "OK"
 
     def parse_hit_object(self, object_line):
         params = object_line.split(",")

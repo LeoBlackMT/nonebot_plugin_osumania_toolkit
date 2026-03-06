@@ -2,7 +2,7 @@ import os
 import asyncio
 from pathlib import Path
 
-from nonebot import on_command, require
+from nonebot import on_command
 from nonebot.adapters.onebot.v11 import MessageEvent, MessageSegment
 from nonebot.log import logger
 
@@ -17,7 +17,7 @@ from nonebot_plugin_localstore import get_plugin_cache_dir
 CACHE_DIR = get_plugin_cache_dir()
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-pressingtime = on_command("pressingtime", aliases={"按压分布"})
+pressingtime = on_command("pressingtime", aliases={"按压"})
 
 @pressingtime.handle()
 async def handle_pressingtime(event: MessageEvent):

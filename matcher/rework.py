@@ -1,11 +1,12 @@
 import os
 
 import aiohttp
-from nonebot import on_command, require
+from nonebot import on_command
 from nonebot.adapters.onebot.v11 import MessageEvent
 
 from ..file.file import download_file_by_id
-from ..algorithm.rework import get_result, est_diff, get_rework_sr, parse_cmd, parse_osu_filename
+from ..algorithm.rework import get_result, est_diff, get_rework_sr, parse_osu_filename
+from ..algorithm.utils import parse_cmd
 
 from nonebot_plugin_localstore import get_plugin_cache_dir
 
@@ -67,7 +68,7 @@ async def handle_rework(event: MessageEvent):
             # 计算星数
             sr, LN_ratio = await get_rework_sr(str(tmp_file), speed_rate, od_flag, cvt_flag)
 
-            await rework.send(get_result(parse_osu_filename(file_name), mod_display, sr, speed_rate, od_flag, LN_ratio, est_diff(sr, LN_ratio)), reply_to=True)
+            await rework.send(get_result(parse_osu_filename(file_name), mod_display, sr, speed_rate, od_flag, LN_ratio, est_diff(sr, LN_ratio)), at_sender=True)
             
         except Exception as e:
             if str(e) == "ParseError":
@@ -82,14 +83,14 @@ async def handle_rework(event: MessageEvent):
         return
     
     elif bid is None:
-        await rework.finish("请回复包含 .osu 文件的消息，或使用 bid 指定谱面。")
+        await rework.finish("请回复一条包含 .osr 文件的消息，或使用 b<谱面ID> 指定谱面。")
     
     else:
         try:
             tmp_file, file_name = await download_file_by_id(CACHE_DIR,bid)
             sr, LN_ratio = await get_rework_sr(str(tmp_file), speed_rate, od_flag, cvt_flag)
 
-            await rework.send(get_result(parse_osu_filename(file_name), mod_display, sr, speed_rate, od_flag, LN_ratio, est_diff(sr, LN_ratio)), reply_to=True)
+            await rework.send(get_result(parse_osu_filename(file_name), mod_display, sr, speed_rate, od_flag, LN_ratio, est_diff(sr, LN_ratio)), at_sender=True)
         except Exception as e:
             await rework.send(f"{e}")
         finally:
