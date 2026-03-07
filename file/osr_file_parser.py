@@ -3,7 +3,6 @@ import numpy as np
 
 from collections import Counter
 from osrparse import GameMode
-from osrparse import Mod
 
 def findkey(x = 0):
     keyset = [0 for i in range(18)]

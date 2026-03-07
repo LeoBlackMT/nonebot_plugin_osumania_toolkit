@@ -113,6 +113,9 @@ class osu_file:
         ln_count = sum(1 for t in self.note_types if t == 128)
         return ln_count / total_notes
     
+    def get_column_count(self):
+        return self.column_count
+    
     def get_note_times(self):
         note_times = {}
         for col, t in zip(self.columns, self.note_starts):

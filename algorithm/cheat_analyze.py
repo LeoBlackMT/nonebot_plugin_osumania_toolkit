@@ -37,10 +37,10 @@ def analyze_time_domain(data: dict) -> dict:
     max_time=500 # 直方图最大时间(ms)
     bin_width=1 # 直方图bin数
     sim_RthresholdC=0.99 # 轨道相似度上作弊阈值
-    sim_RthresholdS=0.95 # 轨道相似度上可疑阈值
+    sim_RthresholdS=0.98 # 轨道相似度上可疑阈值
     sim_LthresholdC=0.4 # 轨道相似度下作弊阈值
     sim_LthresholdS=0.55 # 轨道相似度下可疑阈值
-    abnormal_peak_threshold = 0.25 # 异常高峰占比阈值
+    abnormal_peak_threshold = 0.33 # 异常高峰占比阈值
     LOW_SR = 330 # 低采样率阈值
     SHORT_BAND = (0, 25) # 短按区间 [0,25) ms
     LONG_BAND = (100, max_time) # 长按区间 [100,500) ms

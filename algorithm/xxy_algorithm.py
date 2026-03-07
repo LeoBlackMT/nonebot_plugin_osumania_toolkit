@@ -97,6 +97,7 @@ def preprocess_file(file_path, speed_rate, od_flag, cvt_flag):
     p = p_obj.get_parsed_data()
     
     LN_ratio = p[8]
+    column_count = p_obj.get_column_count()
     
     if p[7] == "Fail":
         return None, 0, 0, [], [], [], [], None, "Fail"
@@ -158,7 +159,7 @@ def preprocess_file(file_path, speed_rate, od_flag, cvt_flag):
              max(n[2] for n in note_seq)) + 1
     
     status = "OK"
-    return status, x, K, T, note_seq, note_seq_by_column, LN_seq, tail_seq, LN_seq_by_column, LN_ratio
+    return status, x, K, T, note_seq, note_seq_by_column, LN_seq, tail_seq, LN_seq_by_column, LN_ratio, column_count
 
 def get_corners(T, note_seq):
     corners_base = set()
@@ -487,7 +488,7 @@ def compute_C_and_Ks(K, T, note_seq, key_usage, base_corners):
 
 def calculate(file_path, speed_rate = 1.0, od_flag = None, cvt_flag = None):
     # === Basic Setup and Parsing ===
-    status, x, K, T, note_seq, note_seq_by_column, LN_seq, tail_seq, LN_seq_by_column, LN_ratio = preprocess_file(file_path, speed_rate, od_flag, cvt_flag)
+    status, x, K, T, note_seq, note_seq_by_column, LN_seq, tail_seq, LN_seq_by_column, LN_ratio, column_count = preprocess_file(file_path, speed_rate, od_flag, cvt_flag)
     
     if status == "Fail":
         return -1
@@ -584,4 +585,4 @@ def calculate(file_path, speed_rate = 1.0, od_flag = None, cvt_flag = None):
     SR = rescale_high(SR)
     SR *= 0.975
     
-    return SR, LN_ratio
+    return SR, LN_ratio, column_count

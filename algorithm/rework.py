@@ -3,7 +3,7 @@ import asyncio
 
 from .xxy_algorithm import calculate
 
-def get_result(map, mod_display: str, sr: float, speed_rate: float, od_flag, LN_ratio: float, est_diff: str):
+def get_result_text(map, mod_display: str, sr: float, speed_rate: float, od_flag, LN_ratio: float, column_count: int):
     
     result = []
     extra_parts = []
@@ -28,7 +28,9 @@ def get_result(map, mod_display: str, sr: float, speed_rate: float, od_flag, LN_
     if LN_ratio:
         result.append(f"LN占比: {LN_ratio:.2%}")
         
-    result.append(f"参考难度 (4K):  {est_diff}") 
+    if column_count == 4 or column_count == 7:
+        result.append(f"参考难度 ({column_count}K):  {est_diff(sr, LN_ratio, column_count)}")
+        
     result.append(f"Rework结果 => {sr:.2f}")
 
     return "谱面信息：\n" + "\n".join(result)
@@ -79,7 +81,7 @@ def parse_osu_filename(file_path: str) -> dict | None:
     }
 
 
-async def get_rework_sr(file_path: str, speed_rate: float, od_flag, cvt_flag):
+async def get_rework_result(file_path: str, speed_rate: float, od_flag, cvt_flag):
     try:
         loop = asyncio.get_running_loop()
         # 将转换标记传入算法
@@ -93,17 +95,18 @@ async def get_rework_sr(file_path: str, speed_rate: float, od_flag, cvt_flag):
         )
         sr = result[0]
         LN_ratio = result[1]
+        column_count = result[2]
         if sr == -1:
             raise Exception("ParseError")
         elif sr == -2:
             raise Exception("NotMania")
-        return sr, LN_ratio
+        return sr, LN_ratio, column_count
     except Exception as e:
         raise Exception(f"{e}")
     
     
-def est_diff(sr: float, LN_ratio: float) -> str:
-    LN_intervals = [
+def est_diff(sr: float, LN_ratio: float, column_count: int) -> str:
+    LN_intervals_4K = [
         (4.832, 4.898, "LN 5 mid"),
         (4.898, 4.963, "LN 5 mid/high"),
         (4.963, 5.095, "LN 5 high"),
@@ -168,7 +171,7 @@ def est_diff(sr: float, LN_ratio: float) -> str:
         (9.316, 9.452, "Lnlism LN 17 mid/high"),
         (9.452, 9.589, "Lnlism LN 17 high"),
     ]
-    RC_intervals = [
+    RC_intervals_4K = [
         (1.502, 1.631, "intro 1 low"),
         (1.631, 1.760, "intro 1 mid/low"),
         (1.760, 1.890, "intro 1 mid"),
@@ -275,34 +278,214 @@ def est_diff(sr: float, LN_ratio: float) -> str:
         (10.909, 11.019, "CloverWisp theta mid/high"),
         (11.019, 11.129, "CloverWisp theta high"),
     ]
-    # RC难度匹配
-    RC_diff = None
-    for lower, upper, name in RC_intervals:
-        if lower <= sr <= upper:
-            RC_diff = name
-            break
-    if RC_diff is None:
-        if sr < 1.502:
-            RC_diff = "< intro 1 low"
-        elif sr > 11.129:
-            RC_diff = "> theta high"
-        else:
-            RC_diff = "未知RC难度"
-
-    if LN_ratio < 0.1:
-        return f"{RC_diff}"
+    LN_intervals_7K = [
+        (4.836, 4.9704, 'LN 3 low'), 
+        (4.9704, 5.1048, 'LN 3 mid/low'), 
+        (5.1048, 5.2392, 'LN 3 mid'), 
+        (5.2392, 5.3736, 'LN 3 mid/high'), 
+        (5.3736, 5.508, 'LN 3 high'), 
+        (5.508, 5.5592, 'LN 4 low'), 
+        (5.5592, 5.6104, 'LN 4 mid/low'), 
+        (5.6104, 5.6616, 'LN 4 mid'), 
+        (5.6616, 5.7128, 'LN 4 mid/high'), 
+        (5.7128, 5.764, 'LN 4 high'),
+        (5.764, 5.8824, 'LN 5 low'), 
+        (5.8824, 6.0008, 'LN 5 mid/low'), 
+        (6.0008, 6.1192, 'LN 5 mid'), 
+        (6.1192, 6.2376, 'LN 5 mid/high'),
+        (6.2376, 6.356, 'LN 5 high'), 
+        (6.356, 6.4708, 'LN 6 low'), 
+        (6.4708, 6.5856, 'LN 6 mid/low'),
+        (6.5856, 6.7004, 'LN 6 mid'), 
+        (6.7004, 6.8152, 'LN 6 mid/high'), 
+        (6.8152, 6.93, 'LN 6 high'), 
+        (6.93, 6.9372, 'LN 7 low'), 
+        (6.9372, 6.9444, 'LN 7 mid/low'), 
+        (6.9444, 6.9516, 'LN 7 mid'), 
+        (6.9516, 6.9588, 'LN 7 mid/high'), 
+        (6.9588, 7.053, 'LN 7 high'), 
+        (7.053, 7.1472, 'LN 8 low'), 
+        (7.1472, 7.2414, 'LN 8 mid/low'), 
+        (7.2414, 7.3356, 'LN 8 mid'), 
+        (7.3356, 7.4298, 'LN 8 mid/high'), 
+        (7.4298, 7.4872, 'LN 8 high'), 
+        (7.4872, 7.5446, 'LN 9 low'), 
+        (7.5446, 7.602, 'LN 9 mid/low'), 
+        (7.602, 7.6594, 'LN 9 mid'), 
+        (7.6594, 7.7168, 'LN 9 mid/high'), 
+        (7.7168, 7.8572, 'LN 9 high'), 
+        (7.8572, 7.9976, 'LN 10 low'), 
+        (7.9976, 8.138, 'LN 10 mid/low'), 
+        (8.138, 8.2784, 'LN 10 mid'), 
+        (8.2784, 8.4188, 'LN 10 mid/high'), 
+        (8.4188, 8.4938, 'LN 10 high'), 
+        (8.4938, 8.5688, 'LN gamma low'),
+        (8.5688, 8.6438, 'LN gamma mid/low'), 
+        (8.6438, 8.7188, 'LN gamma mid'), 
+        (8.7188, 8.7938, 'LN gamma mid/high'),
+        (8.7938, 8.8878, 'LN gamma high'), 
+        (8.8878, 8.9818, 'LN azimuth low'), 
+        (8.9818, 9.0758, 'LN azimuth mid/low'),
+        (9.0758, 9.1698, 'LN azimuth mid'),
+        (9.1698, 9.2638, 'LN azimuth mid/high'),
+        (9.2638, 9.3784, 'LN azimuth high'), 
+        (9.3784, 9.493, 'LN zenith low'), 
+        (9.493, 9.6076, 'LN zenith mid/low'), 
+        (9.6076, 9.7222, 'LN zenith mid'),
+        (9.7222, 9.8368, 'LN zenith mid/high'),
+        (9.8368, 9.975, 'LN zenith high'), 
+        (9.975, 10.1132, 'LN stellium low'), 
+        (10.1132, 10.2514, 'LN stellium mid/low'),
+        (10.2514, 10.3896, 'LN stellium mid'), 
+        (10.3896, 10.5278, 'LN stellium mid/high'), 
+        (10.5278, 10.666, 'LN stellium high')
+        ]
+    RC_intervals_7K = [
+        (3.5085, 3.6631, 'regular 0 low'), 
+        (3.6631, 3.8177, 'regular 0 mid/low'), 
+        (3.8177, 3.9723, 'regular 0 mid'), 
+        (3.9723, 4.1269, 'regular 0 mid/high'), 
+        (4.1269, 4.2815, 'regular 0 high'), 
+        (4.2815, 4.4361, 'regular 1 low'), 
+        (4.4361, 4.5907, 'regular 1 mid/low'), 
+        (4.5907, 4.7202, 'regular 1 mid'), 
+        (4.7202, 4.8246, 'regular 1 mid/high'), 
+        (4.8246, 4.929, 'regular 1 high'), 
+        (4.929, 5.0334, 'regular 2 low'), 
+        (5.0334, 5.1378, 'regular 2 mid/low'), 
+        (5.1378, 5.2379, 'regular 2 mid'), 
+        (5.2379, 5.3337, 'regular 2 mid/high'), 
+        (5.3337, 5.4295, 'regular 2 high'), 
+        (5.4295, 5.5253, 'regular 3 low'), 
+        (5.5253, 5.6211, 'regular 3 mid/low'), 
+        (5.6211, 5.6927, 'regular 3 mid'), 
+        (5.6927, 5.7401, 'regular 3 mid/high'), 
+        (5.7401, 5.7875, 'regular 3 high'), 
+        (5.7875, 5.8349, 'regular 4 low'), 
+        (5.8349, 5.8823, 'regular 4 mid/low'), 
+        (5.8823, 5.9313, 'regular 4 mid'), 
+        (5.9313, 5.9819, 'regular 4 mid/high'), 
+        (5.9819, 6.0325, 'regular 4 high'), 
+        (6.0325, 6.0831, 'regular 5 low'), 
+        (6.0831, 6.1337, 'regular 5 mid/low'), 
+        (6.1337, 6.2176, 'regular 5 mid'), 
+        (6.2176, 6.3348, 'regular 5 mid/high'), 
+        (6.3348, 6.452, 'regular 5 high'), 
+        (6.452, 6.5692, 'regular 6 low'), 
+        (6.5692, 6.6864, 'regular 6 mid/low'), 
+        (6.6864, 6.7772, 'regular 6 mid'), 
+        (6.7772, 6.8416, 'regular 6 mid/high'), 
+        (6.8416, 6.906, 'regular 6 high'), 
+        (6.906, 6.9704, 'regular 7 low'), 
+        (6.9704, 7.0348, 'regular 7 mid/low'), 
+        (7.0348, 7.1085, 'regular 7 mid'), 
+        (7.1085, 7.1915, 'regular 7 mid/high'), 
+        (7.1915, 7.2745, 'regular 7 high'), 
+        (7.2745, 7.3575, 'regular 8 low'), 
+        (7.3575, 7.4405, 'regular 8 mid/low'), 
+        (7.4405, 7.5096, 'regular 8 mid'), 
+        (7.5096, 7.5648, 'regular 8 mid/high'), 
+        (7.5648, 7.62, 'regular 8 high'), 
+        (7.62, 7.6752, 'regular 9 low'), 
+        (7.6752, 7.7304, 'regular 9 mid/low'), 
+        (7.7304, 7.8134, 'regular 9 mid'), 
+        (7.8134, 7.9242, 'regular 9 mid/high'), 
+        (7.9242, 8.035, 'regular 9 high'),
+        (8.035, 8.1458, 'regular 10 low'), 
+        (8.1458, 8.2566, 'regular 10 mid/low'), 
+        (8.2566, 8.357, 'regular 10 mid'), 
+        (8.357, 8.447, 'regular 10 mid/high'),
+        (8.447, 8.537, 'regular 10 high'), 
+        (8.537, 8.627, 'regular gamma low'), 
+        (8.627, 8.717, 'regular gamma mid/low'),
+        (8.717, 8.8079, 'regular gamma mid'),
+        (8.8079, 8.8997, 'regular gamma mid/high'),
+        (8.8997, 8.9915, 'regular gamma high'), 
+        (8.9915, 9.0833, 'regular azimuth low'), 
+        (9.0833, 9.1751, 'regular azimuth mid/low'),
+        (9.1751, 9.2921, 'regular azimuth mid'), 
+        (9.2921, 9.4343, 'regular azimuth mid/high'),
+        (9.4343, 9.5765, 'regular azimuth high'), 
+        (9.5765, 9.7187, 'regular zenith low'), 
+        (9.7187, 9.8609, 'regular zenith mid/low'), 
+        (9.8609, 9.9728, 'regular zenith mid'),
+        (9.9728, 10.0544, 'regular zenith mid/high'),
+        (10.0544, 10.136, 'regular zenith high'), 
+        (10.136, 10.2176, 'regular stellium low'),
+        (10.2176, 10.2992, 'regular stellium mid/low'), 
+        (10.2992, 10.3808, 'regular stellium mid'), 
+        (10.3808, 10.4624, 'regular stellium mid/high'), 
+        (10.4624, 10.544, 'regular stellium high')
+    ]
     
-    # LN难度匹配
-    LN_diff = None
-    for lower, upper, name in LN_intervals:
-        if lower <= sr <= upper:
-            LN_diff = name
-            break
-    if LN_diff is None:
-        if sr < 4.832:
-            LN_diff = "< LN 5 mid"
-        elif sr > 9.589:
-            LN_diff = "> LN 17 high"
-        else:
-            LN_diff = "未知LN难度"
-    return f"{RC_diff} || {LN_diff}"
+    if column_count == 4:
+        RC_diff = None
+        for lower, upper, name in RC_intervals_4K:
+            if lower <= sr <= upper:
+                RC_diff = name
+                break
+        if RC_diff is None:
+            if sr < 1.502:
+                RC_diff = "< intro 1 low"
+            elif sr > 11.129:
+                RC_diff = "> theta high"
+            else:
+                RC_diff = "未知RC难度"
+
+        if LN_ratio < 0.1:
+            return f"{RC_diff}"
+        
+        LN_diff = None
+        for lower, upper, name in LN_intervals_4K:
+            if lower <= sr <= upper:
+                LN_diff = name
+                break
+        if LN_diff is None:
+            if sr < 4.832:
+                LN_diff = "< LN 5 mid"
+            elif sr > 9.589:
+                LN_diff = "> LN 17 high"
+            else:
+                LN_diff = "未知LN难度"
+        
+        if LN_ratio > 0.9:
+            return f"{LN_diff}"
+        
+        return f"{RC_diff} || {LN_diff}"
+    
+    if column_count == 7:
+        RC_diff = None
+        for lower, upper, name in RC_intervals_7K:
+            if lower <= sr <= upper:
+                RC_diff = name
+                break
+        if RC_diff is None:
+            if sr < 1.502:
+                RC_diff = "< intro 1 low"
+            elif sr > 11.129:
+                RC_diff = "> theta high"
+            else:
+                RC_diff = "未知RC难度"
+
+        if LN_ratio < 0.1:
+            return f"{RC_diff}"
+        
+        LN_diff = None
+        for lower, upper, name in LN_intervals_7K:
+            if lower <= sr <= upper:
+                LN_diff = name
+                break
+        if LN_diff is None:
+            if sr < 4.832:
+                LN_diff = "< LN 5 mid"
+            elif sr > 9.589:
+                LN_diff = "> LN 17 high"
+            else:
+                LN_diff = "未知LN难度"
+        
+        if LN_ratio > 0.9:
+            return f"{LN_diff}"
+        
+        return f"{RC_diff} || {LN_diff}"
+    
+    return "未知难度"
