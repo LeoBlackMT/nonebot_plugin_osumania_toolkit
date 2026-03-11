@@ -74,13 +74,7 @@ def read_string(data, offset):
     else:
         # 无效标志，返回空
         return "", offset
-
-class ReplayEvent:
-    """模拟osrparse的事件对象，仅包含time_delta和keys""" 
-    def __init__(self, time_delta, keys):
-        self.time_delta = time_delta
-        self.keys = keys
-
+    
 def findkey(x=0):
     """将按键掩码转换为18位二进制数组"""
     keyset = [0] * 18
@@ -90,6 +84,14 @@ def findkey(x=0):
         a, keyset[j] = a // 2, a % 2
         j += 1
     return np.array(keyset)
+
+# ---------- 核心类 ----------
+
+class ReplayEvent:
+    """模拟osrparse的事件对象，仅包含time_delta和keys""" 
+    def __init__(self, time_delta, keys):
+        self.time_delta = time_delta
+        self.keys = keys
 
 class osr_file:
     def __init__(self, file_path):
@@ -364,6 +366,7 @@ class osr_file:
         ]
 
         # 估算采样率（使用实时间隔）
+        # 保留旧算法作为主要采样率估算方法
         if self.intervals:
             # 改进的采样率估算算法
             # 1. 过滤掉异常大的间隔（可能由于暂停、定位帧等）
@@ -401,6 +404,18 @@ class osr_file:
                 self.sample_rate = float('inf')
         else:
             self.sample_rate = float('inf')
+        
+        # 使用FFT算法分析按键时长的频率特征（移植自 osu_replay_parser.py）
+        if self.pressset:
+            # 收集所有按键时长数据
+            all_durations = []
+            for col_data in self.pressset:
+                all_durations.extend(col_data)
+            
+            # 执行FFT分析
+            self.fft_analysis_result = self._perform_fft_analysis(all_durations)
+        else:
+            self.fft_analysis_result = None
 
         # 过滤无效轨道（使用原始数据判断？用 pressset_raw 或 pressset 均可）
         valid_pressset = [p for p in self.pressset if len(p) > 5]
@@ -414,37 +429,9 @@ class osr_file:
         logger.debug(f"按下事件时间样本（前10个）：{str(self.press_times[:10])}")
         logger.debug(f"按下事件时间样本（后10个）：{str(self.press_times[-10:])}")
 
-        # # 如果存在 Mirror 模组，进行水平镜像（轨道翻转）
-        # if self.mod & 1073741824:  # Mirror 位 (1 << 30)
-        #     # 确定有效轨道数（列数）
-        #     # 找出 pressset 中非空轨道的最大索引
-        #     max_col = -1
-        #     for col_idx, presses in enumerate(self.pressset):
-        #         if presses:
-        #             max_col = max(max_col, col_idx)
-        #     if max_col >= 0:
-        #         column_count = max_col + 1
-        #         # 镜像 pressset
-        #         mirrored_pressset = [[] for _ in range(18)]
-        #         for col in range(column_count):
-        #             mirrored_col = column_count - 1 - col
-        #             mirrored_pressset[mirrored_col] = self.pressset[col]
-        #         # 镜像 press_events
-        #         mirrored_events = []
-        #         for col, t in self.press_events:
-        #             if col < column_count:
-        #                 mirrored_col = column_count - 1 - col
-        #                 mirrored_events.append((mirrored_col, t))
-        #             else:
-        #                 mirrored_events.append((col, t))
-        #         self.pressset = mirrored_pressset
-        #         self.press_events = mirrored_events
-        #         # 重新生成 press_times（按时间排序）
-        #         self.press_times = [t for _, t in sorted(self.press_events, key=lambda x: x[1])]
-        #         logger.debug(f"应用 Mirror 模组：轨道 {list(range(column_count))} 镜像为 {list(range(column_count-1, -1, -1))}")
 
     def get_data(self):
-        return {
+        data = {
             "status": self.status,
             "player_name": self.player_name,
             "mod": self.mod,
@@ -462,6 +449,116 @@ class osr_file:
             "timestamp": self.timestamp,
             "file_path": self.file_path,
             "judge": self.judge
+        }
+        
+        # 添加FFT分析结果（如果可用）
+        if hasattr(self, 'fft_analysis_result') and self.fft_analysis_result:
+            data["fft_analysis"] = self.fft_analysis_result
+        
+        return data
+        
+    def _perform_fft_analysis(self, durations):
+        """
+        执行对齐 1024 点的 FFT 分析（移植自 osu_replay_parser.py）：
+        1. 信号采样长度与 FFT 计算点数均设为 1024，获得约 0.98Hz 的物理分辨率。
+        2. 引入邻域对比逻辑：通过检查峰值左侧(0-10Hz)强度，识别低频泄露伪峰。
+        3. 结合局部显著性(Local SNR)，精准区分高性能设备与固定频率键盘。
+        
+        返回分析结果字典，包含：
+        - peak_frequency: 检测到的主峰频率（Hz）
+        - conclusion: 分析结论
+        - local_snr: 局部信噪比
+        - global_snr: 全局信噪比
+        - is_valid_peak: 是否为有效峰值
+        """
+        if not durations:
+            return {
+                'peak_frequency': 0,
+                'conclusion': '无有效数据',
+                'local_snr': 0,
+                'global_snr': 0,
+                'is_valid_peak': False
+            }
+        
+        try:
+            from scipy.fft import fft, fftfreq
+        except ImportError:
+            logger.warning("scipy 未安装，无法使用FFT分析")
+            return {
+                'peak_frequency': 0,
+                'conclusion': 'scipy未安装，无法进行FFT分析',
+                'local_snr': 0,
+                'global_snr': 0,
+                'is_valid_peak': False
+            }
+        
+        fs = 1000  # 1ms 采样 = 1000Hz
+        n_points = 1024 
+        
+        # 构建信号 (统计 0-1024ms 内的分布)
+        signal = np.zeros(n_points)
+        counts = Counter([int(d) for d in durations if 0 < d < n_points])
+        for ms, count in counts.items():
+            signal[ms] = count
+        
+        # 去直流分量 (减去均值)
+        signal = signal - np.mean(signal)
+
+        # 执行 FFT (保留全频段用于邻域形状对比)
+        yf = fft(signal)
+        xf = fftfreq(n_points, 1/fs)[:n_points//2]
+        amplitude = 2.0/n_points * np.abs(yf[0:n_points//2])
+
+        # 在 10Hz - 500Hz 范围内搜索最高点
+        mask = (xf >= 10) & (xf <= 500)
+        search_xf = xf[mask]
+        search_amp = amplitude[mask]
+        
+        if len(search_amp) == 0:
+            return {
+                'peak_frequency': 0,
+                'conclusion': '在10-500Hz范围内未检测到有效峰值',
+                'local_snr': 0,
+                'global_snr': 0,
+                'is_valid_peak': False
+            }
+            
+        peak_idx_in_search = np.argmax(search_amp)
+        est_hz = search_xf[peak_idx_in_search]
+        max_val = search_amp[peak_idx_in_search]
+
+        # 找到该点在原始 amplitude 数组中的全局索引
+        abs_idx = np.argmin(np.abs(xf - est_hz))
+        
+        is_invalid_peak = False
+        # 判定：如果左边邻居比自己还高，说明这只是从 0Hz 漫延下来的"山脚"而非独立的硬件特征
+        if abs_idx > 0 and amplitude[abs_idx - 1] > amplitude[abs_idx]:
+            if est_hz < 25: # 仅针对低频段应用此形状判定
+                is_invalid_peak = True
+
+        # 计算显著性指标
+        local_mask = (xf > est_hz - 15) & (xf < est_hz + 15)
+        local_avg = np.mean(amplitude[local_mask])
+        local_snr = max_val / local_avg if local_avg > 0 else 0
+        
+        global_avg = np.mean(search_amp)
+        global_snr = max_val / global_avg if global_avg > 0 else 0
+
+        # 综合判定结论
+        # 触发条件：形状不完整(泄露)、局部不突出、全局平坦、或接近采样极限
+        if is_invalid_peak or local_snr < 1.7 or global_snr < 3.8 or est_hz > 492:
+            conclusion = f">=500Hz (表现接近记录上限，检测峰值: {est_hz:.1f}Hz)"
+            is_valid = False
+        else:
+            conclusion = f"检测到显著峰值: {est_hz:.1f}Hz"
+            is_valid = True
+        
+        return {
+            'peak_frequency': float(est_hz),
+            'conclusion': conclusion,
+            'local_snr': float(local_snr),
+            'global_snr': float(global_snr),
+            'is_valid_peak': is_valid
         }
         
     def _parse_mods(self, mod_value: int) -> list:

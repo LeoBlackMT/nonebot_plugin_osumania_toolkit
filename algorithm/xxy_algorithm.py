@@ -81,22 +81,22 @@ def find_next_note_in_column(note, times, note_seq_by_column):
 def preprocess_file(file_path, speed_rate, od_flag, cvt_flag):
     p_obj = osu_file(file_path)
     p_obj.process()
-    
+    p = p_obj.get_parsed_data()
+    LN_ratio = p[8]
     if cvt_flag:
         if "IN" in cvt_flag:
             try:
                 p_obj.mod_IN(cvt_flag[1])
+                LN_ratio = p_obj.get_LN_ratio()
             except Exception:
                 pass
         if "HO" in cvt_flag:
             try:
                 p_obj.mod_HO()
+                LN_ratio = p_obj.get_LN_ratio()
             except Exception:
                 pass
 
-    p = p_obj.get_parsed_data()
-    
-    LN_ratio = p[8]
     column_count = p_obj.get_column_count()
     
     if p[7] == "Fail":

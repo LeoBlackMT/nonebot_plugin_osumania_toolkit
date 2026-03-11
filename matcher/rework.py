@@ -3,10 +3,13 @@ import os
 import aiohttp
 from nonebot import on_command
 from nonebot.adapters.onebot.v11 import MessageEvent
+from pathlib import Path
 
 from ..file.file import download_file_by_id
+from ..file.osu_file_parser import osu_file
 from ..algorithm.rework import get_result_text, get_rework_result, parse_osu_filename
-from ..algorithm.utils import parse_cmd
+from ..algorithm.utils import parse_cmd, is_mc_file
+from ..algorithm.convert import convert_mc_to_osu
 
 from nonebot_plugin_localstore import get_plugin_cache_dir
 
@@ -35,7 +38,7 @@ async def handle_rework(event: MessageEvent):
                 file_seg = seg
                 break
         if not file_seg:
-            await rework.finish("回复的消息中没有找到 .osu 文件。")
+            await rework.finish("回复的消息中没有找到文件。")
 
         # 获取文件信息
         file_ident = file_seg.data.get("file", "")
@@ -43,8 +46,9 @@ async def handle_rework(event: MessageEvent):
         if not file_ident:
             await rework.finish("文件信息不完整。")
         file_name = os.path.basename(file_ident)
-        if not file_name.lower().endswith(".osu"):
-            await rework.finish("请回复 .osu 格式的谱面文件。")
+        # 支持 .osu 和 .mc 文件
+        if not (file_name.lower().endswith(".osu") or file_name.lower().endswith(".mc")):
+            await rework.finish("请回复 .osu 或 .mc 格式的谱面文件。")
         if not file_url:
             await rework.finish("无法获取文件下载链接。")
 
@@ -64,11 +68,28 @@ async def handle_rework(event: MessageEvent):
         except Exception as e:
             await rework.finish(f"下载异常：{e}")
 
+        # 检查是否为 .mc 文件，如果是则转换为 .osu
+        process_file = tmp_file
+        mc_file = is_mc_file(process_file)
+        if mc_file:
+            try:
+                # 转换为 .osu 文件
+                osu_file_path = convert_mc_to_osu(str(tmp_file), str(CACHE_DIR))
+                process_file = Path(osu_file_path)
+                file_name = os.path.basename(osu_file_path)
+            except Exception as e:
+                await rework.finish(f".mc 文件转换失败: {e}")
+
+
         try:
             # 计算星数
-            sr, LN_ratio, column_count = await get_rework_result(str(tmp_file), speed_rate, od_flag, cvt_flag)
-
-            await rework.send(get_result_text(parse_osu_filename(file_name), mod_display, sr, speed_rate, od_flag, LN_ratio, column_count), reply_to=True)
+            sr, LN_ratio, column_count = await get_rework_result(str(process_file), speed_rate, od_flag, cvt_flag)
+            meta_data = parse_osu_filename(file_name)
+            if not meta_data:
+                osu_obj = osu_file(process_file)
+                osu_obj.process()
+                meta_data = osu_obj.meta_data
+            await rework.send(get_result_text(meta_data, mod_display, sr, speed_rate, od_flag, LN_ratio, column_count), to_sender=True)
             
         except Exception as e:
             if str(e) == "ParseError":
@@ -80,17 +101,19 @@ async def handle_rework(event: MessageEvent):
         finally:
             if tmp_file and tmp_file.exists():
                 tmp_file.unlink()
+            if process_file != tmp_file and process_file.exists():
+                process_file.unlink()
         return
     
     elif bid is None:
-        await rework.finish("请回复一条包含 .osu 文件的消息，或使用 b<谱面ID> 指定谱面。")
+        await rework.finish("请回复包含 .osu 或 .mc 文件的消息，或使用 bid 指定谱面。")
     
     else:
         try:
             tmp_file, file_name = await download_file_by_id(CACHE_DIR,bid)
             sr, LN_ratio, column_count = await get_rework_result(str(tmp_file), speed_rate, od_flag, cvt_flag)
 
-            await rework.send(get_result_text(parse_osu_filename(file_name), mod_display, sr, speed_rate, od_flag, LN_ratio, column_count), reply_to=True)
+            await rework.send(get_result_text(parse_osu_filename(file_name), mod_display, sr, speed_rate, od_flag, LN_ratio, column_count), to_sender=True)
         except Exception as e:
             await rework.send(f"{e}")
         finally:

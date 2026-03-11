@@ -3,7 +3,7 @@ import asyncio
 
 from .xxy_algorithm import calculate
 
-def get_result_text(map, mod_display: str, sr: float, speed_rate: float, od_flag, LN_ratio: float, column_count: int):
+def get_result_text(meta_data, mod_display: str, sr: float, speed_rate: float, od_flag, LN_ratio: float, column_count: int):
     
     result = []
     extra_parts = []
@@ -15,10 +15,10 @@ def get_result_text(map, mod_display: str, sr: float, speed_rate: float, od_flag
     if isinstance(od_flag, (int, float)):
         extra_parts.append(f"OD{od_flag}")
         
-    if isinstance(map, dict):
-        result.append(f"{map['mapper']} // {map['artist']} - {map['title']} [{map['difficulty']}]")
+    if isinstance(meta_data, dict):
+        result.append(f"{meta_data['Creator']} // {meta_data['Artist']} - {meta_data['Title']} [{meta_data['Version']}]")
     else:
-        result.append(f"{map}")
+        result.append("解析元信息出错")
         
     if extra_parts:
         result.append(f"Mods: {mod_display}, " + ", ".join(extra_parts))
@@ -74,10 +74,10 @@ def parse_osu_filename(file_path: str) -> dict | None:
     title = title.strip()
     
     return {
-        'artist': artist,
-        'title': title,
-        'mapper': mapper,
-        'difficulty': difficulty
+        'Artist': artist,
+        'Title': title,
+        'Creator': mapper,
+        'Version': difficulty
     }
 
 

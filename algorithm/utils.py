@@ -1,4 +1,7 @@
 import bisect
+import json
+import os
+
 from nonebot.log import logger
 
 from ..file.osr_file_parser import osr_file
@@ -233,3 +236,41 @@ def parse_cmd(cmd_text: str):
         i += 1
 
     return speed_rate, od_flag, cvt_flag, bid, mod_display, err_msg
+
+def is_mc_file(file_path: str) -> bool:
+    """
+    检查文件是否为有效的 .mc 文件
+    
+    Args:
+        file_path: 文件路径
+        
+    Returns:
+        是否为有效的 .mc 文件
+    """
+    if not os.path.exists(file_path):
+        return False
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        # 基本验证
+        if 'meta' not in data:
+            return False
+        
+        meta = data['meta']
+        if 'mode' not in meta or meta['mode'] != 0:
+            return False
+        
+        if 'mode_ext' not in meta or 'column' not in meta['mode_ext']:
+            return False
+        
+        if 'time' not in data or not data['time']:
+            return False
+        
+        if 'note' not in data:
+            return False
+        
+        return True
+    except:
+        return False

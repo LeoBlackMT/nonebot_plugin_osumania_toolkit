@@ -32,7 +32,7 @@ def analyze_time_domain(data: dict) -> dict:
         reason: 原因描述
     '''
     pressset = data["pressset"]
-    sample_rate = data["sample_rate"]
+    sample_rate = data["fft_analysis"]["peak_frequency"] if data["fft_analysis"]["peak_frequency"] != 0 else data["sample_rate"]
     
     # 可变内置参数
     max_time=500 # 直方图最大时间(ms)
@@ -42,7 +42,7 @@ def analyze_time_domain(data: dict) -> dict:
     sim_LthresholdC=0.4 # 轨道相似度下作弊阈值
     sim_LthresholdS=0.55 # 轨道相似度下可疑阈值
     abnormal_peak_threshold = 0.33 # 异常高峰占比阈值
-    LOW_SR = 330 # 低采样率阈值
+    LOW_SR = 165 # 低采样率阈值
     SHORT_BAND = (0, 25) # 短按区间 [0,25) ms
     LONG_BAND = (100, max_time) # 长按区间 [100,500) ms
     
@@ -258,7 +258,7 @@ def analyze_pulse_spectrum(data: dict) -> dict:
     """
     press_times = data["press_times"]
     intervals = data["intervals"]
-    sample_rate = data["sample_rate"]
+    sample_rate = data["fft_analysis"]["peak_frequency"] if data["fft_analysis"]["peak_frequency"] != 0 else data["sample_rate"]
 
     if not press_times or not intervals:
         return {

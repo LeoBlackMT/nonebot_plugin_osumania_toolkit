@@ -22,6 +22,7 @@ class osu_file:
         self.status = "init"
         self.LN_ratio = 0.0
         self.note_times = {}
+        self.meta_data = {}
 
     def get_parsed_data(self):
         return [self.column_count,
@@ -32,7 +33,8 @@ class osu_file:
                 self.od,
                 self.GameMode,
                 self.status,
-                self.LN_ratio
+                self.LN_ratio,
+                self.meta_data
                 ]
     
     def process(self):
@@ -40,11 +42,25 @@ class osu_file:
             lines = f.readlines()  # 一次性读取所有行，避免迭代器问题
 
         i = 0
+        in_metadata_section = False
         while i < len(lines):
             line = lines[i].strip()
             if not line:
                 i += 1
                 continue
+
+            # 解析 [metadata] 部分
+            if line == "[Metadata]":
+                in_metadata_section = True
+                i += 1
+                continue
+            elif line.startswith("[") and line.endswith("]"):
+                in_metadata_section = False
+
+            if in_metadata_section:
+                if ":" in line:
+                    key, value = line.split(":", 1)
+                    self.meta_data[key.strip()] = value.strip()
 
             if "OverallDifficulty:" in line:
                 try:
