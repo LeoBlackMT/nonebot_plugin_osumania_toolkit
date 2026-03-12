@@ -1,6 +1,14 @@
 import json
 import os
+import datetime
+
+from collections import Counter
 from typing import List, Optional
+
+from ..algorithm.utils import malody_mods_to_osu_mods
+
+from ..file.osr_file_parser import osr_file, ReplayEvent
+from ..file.mr_file_parser import mr_file
 
 
 def convert_mc_to_osu(mc_file_path: str, output_dir: Optional[str] = None) -> str:
@@ -289,3 +297,122 @@ def convert_mc_to_osu(mc_file_path: str, output_dir: Optional[str] = None) -> st
         raise Exception(f"写入 .osu 文件失败: {e}")
     
     return output_path
+
+def convert_mr_to_osr(mr_obj: mr_file) -> osr_file:
+    """
+    将 mr_file 对象转换为 osr_file 实例，使其兼容现有绘图和分析代码。
+    返回的 osr_file 实例已经设置好所有属性，可直接用于后续流程。
+    """
+
+    # 创建一个 osr_file 实例，跳过实际文件解析
+    osr = osr_file.__new__(osr_file)
+    # 设置基本属性
+    osr.file_path = mr_obj.file_path
+    osr.status = mr_obj.status  # 可能为 "OK" 或 "ParseError"
+    osr.player_name = "ConvertedFromMalody"
+    osr.mod = malody_mods_to_osu_mods(mr_obj.mods_flags)
+
+    # 判定映射：best->320, cool->200, good->100, miss->0
+    osr.judge = {
+        "320": mr_obj.best_count,
+        "300": 0,
+        "200": mr_obj.cool_count,
+        "100": mr_obj.good_count,
+        "50": 0,
+        "0": mr_obj.miss_count,
+    }
+    # 设为 0 兼容性优先
+    osr.score = 0  
+    osr.ratio = 0
+    # 以malody计分方式计算 acc 
+    tot_obj = mr_obj.best_count + mr_obj.cool_count + mr_obj.good_count + mr_obj.miss_count
+    if tot_obj > 0:
+        osr.acc = (mr_obj.best_count * 100 + mr_obj.cool_count * 75 + mr_obj.good_count * 40) / (tot_obj * 100) * 100
+    else:
+        osr.acc = 0.0
+    # 时间戳转换：Unix 秒 -> datetime
+    osr.timestamp = datetime.datetime.fromtimestamp(mr_obj.timestamp) if mr_obj.timestamp else datetime.datetime.min
+
+    # HP数据不存在
+    osr.life_bar_graph = ""
+
+    # 以下属性从动作序列生成
+    osr.pressset = [[] for _ in range(18)]
+    osr.intervals = []
+    osr.press_times = []
+    osr.press_events = []
+    osr.play_data = []
+
+    # 按时间排序动作
+    actions = sorted(mr_obj.actions, key=lambda x: x[0])
+    if not actions:
+        osr.status = "tooFewKeys"
+        return osr
+
+    # 记录当前每列的按键状态 (True/False)
+    current_state = [False] * 18
+    # 记录每列按下开始时间
+    pressed_start = [None] * 18
+    # 上一个事件的时间（用于计算 time_delta）
+    prev_time = None
+    # 当前累积时间（用于绝对时间）
+    for time, action, col in actions:
+        if col >= 18:
+            continue  # 忽略超出轨道
+        # 根据 action 更新状态
+        if action == 1:  # 按下
+            if not current_state[col]:
+                current_state[col] = True
+                pressed_start[col] = time
+                # 记录按下事件
+                osr.press_times.append(time)
+                osr.press_events.append((col, time))
+        elif action == 2:  # 释放
+            if current_state[col]:
+                current_state[col] = False
+                if pressed_start[col] is not None:
+                    duration = time - pressed_start[col]
+                    if duration >= 0:
+                        osr.pressset[col].append(int(duration))
+                    pressed_start[col] = None
+        # 构建当前时刻的按键掩码
+        keys_mask = 0
+        for c in range(18):
+            if current_state[c]:
+                keys_mask |= (1 << c)
+
+        # 生成 play_data 事件：需要相对时间差
+        if prev_time is None:
+            delta = time  
+            # 按照 osr ，第一个事件的时间差可能是第一个时间点，但通常为 0 或正数。
+            # osu! 回放第一个事件的时间差是从 0 到第一个事件的时间，所以 delta = time - 0 = time
+            # 为了与 osr_file 兼容，直接使用 time 作为 delta（假设起始时间为 0）
+        else:
+            delta = time - prev_time
+        if delta < 0:
+            delta = 0
+        # 创建事件对象
+        event = ReplayEvent(delta, keys_mask)
+        osr.play_data.append(event)
+        osr.intervals.append(delta)
+        prev_time = time
+
+    # 计算采样率
+    if osr.intervals:
+        interval_counts = Counter(osr.intervals)
+        most_common_interval, _ = interval_counts.most_common(1)[0]
+        osr.sample_rate = 1000 / most_common_interval if most_common_interval > 0 else float('inf')
+    else:
+        osr.sample_rate = float('inf')
+
+    # 过滤无效轨道（少于5次按压的轨道视为无效，但保留原样，仅用于状态）
+    valid_pressset = [p for p in osr.pressset if len(p) > 5]
+    if len(valid_pressset) < 2:
+        osr.status = "tooFewKeys"
+    else:
+        osr.status = "OK"
+
+    # 时间戳已包含速度模组，无需再缩放
+    osr.corrector = 1.0
+
+    return osr

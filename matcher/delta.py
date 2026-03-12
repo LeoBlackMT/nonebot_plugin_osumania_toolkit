@@ -2,22 +2,21 @@ import os
 import asyncio
 from pathlib import Path
 
-from nonebot import on_command
 from nonebot.adapters.onebot.v11 import MessageEvent, MessageSegment, Message
 from nonebot.typing import T_State
-from nonebot.params import Arg
 from nonebot.exception import FinishedException
-# from nonebot.log import logger
+from nonebot import on_command
+from nonebot_plugin_localstore import get_plugin_cache_dir
+from nonebot.params import Arg
 
 from ..file.osu_file_parser import osu_file
 from ..file.osr_file_parser import osr_file
+from ..file.mr_file_parser import mr_file
 
 from ..file.draw import plot_delta
 from ..file.file import safe_filename, download_file, download_file_by_id, cleanup_temp_file
-from ..algorithm.utils import parse_cmd
-
-
-from nonebot_plugin_localstore import get_plugin_cache_dir
+from ..algorithm.utils import parse_cmd, is_mc_file
+from ..algorithm.convert import convert_mr_to_osr, convert_mc_to_osu
 
 CACHE_DIR = get_plugin_cache_dir()
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
@@ -34,14 +33,17 @@ async def handle_first(event: MessageEvent, state: T_State):
     if cmd_err_msg:
         state["status"] = "Fail"
         await delta.finish("错误:\n" + "\n".join(cmd_err_msg) + "\n请检查命令格式并重试。")
+    
+    if not bid:
+        await delta.finish("请回复一条包含回放文件的消息，同时使用 b<谱面ID> 指定谱面。")
 
     if not event.reply:
         if bid is None:
             state["status"] = "Fail"
-            await delta.finish("请回复一条包含 .osr 文件的消息，或使用 b<谱面ID> 指定谱面。")
+            await delta.finish("请回复一条包含回放文件的消息，同时使用 b<谱面ID> 指定谱面。")
         else:
             state["status"] = "Fail"
-            await delta.finish("请回复一条包含 .osr 文件的消息。")
+            await delta.finish("请回复一条包含回放文件的消息。")
         # return
 
     reply = event.reply
@@ -65,9 +67,9 @@ async def handle_first(event: MessageEvent, state: T_State):
         state["status"] = "Fail"
         await delta.finish("无法获取文件下载链接。")
     file_name = os.path.basename(file_name)
-    if not file_name.lower().endswith(".osr"):
+    if not (file_name.lower().endswith(".osr") and file_name.lower().endwith(".mr")) :
         state["status"] = "Fail"
-        await delta.finish("请回复 .osr 格式的回放文件。")
+        await delta.finish("请回复 .osr 或 .mr 格式的回放文件。")
     if not file_url:
         state["status"] = "Fail"
         await delta.finish("无法获取文件下载链接。")
@@ -82,8 +84,13 @@ async def handle_first(event: MessageEvent, state: T_State):
             state["status"] = "Fail"
             await delta.finish("文件下载失败，请稍后重试。")
             
-        osr = osr_file(osr_path)
-        osr.process()
+        if file_name.lower().endswith(".mr"):
+            state["status"] = "Malody"
+            osr = convert_mr_to_osr(mr_file(osr_path))
+        else:
+            osr = osr_file(osr_path)
+            osr.process()
+            
         match osr.status:
             case "NotMania":
                 file_err_msg.append("该回放不是 Mania 模式。")
@@ -95,13 +102,15 @@ async def handle_first(event: MessageEvent, state: T_State):
                 pass
 
     except FinishedException:
+        pass
+    except Exception as e:
+        state["status"] = "Fail"
+        await delta.send(f"处理过程中发生错误：{type(e).__name__}: {e}")
+    finally:
         if osr_path and osr_path.exists():
             asyncio.create_task(cleanup_temp_file(osr_path))
         if output_path and Path(output_path).exists():
             asyncio.create_task(cleanup_temp_file(Path(output_path)))
-    except Exception as e:
-        state["status"] = "Fail"
-        await delta.send(f"处理过程中发生错误：{type(e).__name__}: {e}")
     
     state["osr"] = osr
     
@@ -137,15 +146,17 @@ async def handle_first(event: MessageEvent, state: T_State):
             # logger.debug(output_path)
             await delta.finish(MessageSegment.image(f"file://{output_path}"))
         except FinishedException:
+            pass
+        except Exception as e:
+            state["status"] = "Fail"
+            await delta.send(f"{e}")
+        finally:
             if osr_path and osr_path.exists():
                 asyncio.create_task(cleanup_temp_file(osr_path))
             if osu_path and osu_path.exists():
                 asyncio.create_task(cleanup_temp_file(osu_path))
             if output_path and Path(output_path).exists():
-                asyncio.create_task(cleanup_temp_file(Path(output_path)))    
-        except Exception as e:
-            state["status"] = "Fail"
-            await delta.send(f"{e}")
+                asyncio.create_task(cleanup_temp_file(Path(output_path))) 
         
     else:
         # 无 bid
@@ -153,11 +164,10 @@ async def handle_first(event: MessageEvent, state: T_State):
             state["status"] = "Fail"
             await delta.finish("错误:\n" + "\n".join(file_err_msg))
         # 直接返回，进入下一个 got 阶段(交互模式),由 @delta.got 处理
-        await delta.send("未提供谱面 ID, 请发送对应的.osu文件。")
+        await delta.send("未提供谱面 ID, 请发送对应的谱面文件。")
         return
 
 @delta.got("user_file")
-# 输入 1 跳过（将执行无谱面操作），输入 0 取消。
 async def handle_file(state: T_State, user_file: Message = Arg("user_file")):
     
     match state["status"]:
@@ -170,7 +180,7 @@ async def handle_file(state: T_State, user_file: Message = Arg("user_file")):
                 asyncio.create_task(cleanup_temp_file(Path(output_path))) 
             await delta.finish()
         case _:
-            pass    
+            pass
     
     # 检查用户是否发送了文件
     file_seg = None
@@ -180,7 +190,7 @@ async def handle_file(state: T_State, user_file: Message = Arg("user_file")):
             break
         
     if not file_seg:
-        await delta.finish("未找到 .osu 文件，操作已取消。")
+        await delta.finish("未找到谱面文件，操作已取消。")
 
     
     file_name = file_seg.data.get("file", "")
@@ -191,8 +201,8 @@ async def handle_file(state: T_State, user_file: Message = Arg("user_file")):
     if not file_url:
         await delta.finish("无法获取文件下载链接。")
     file_name = os.path.basename(file_name)
-    if not file_name.lower().endswith(".osu"):
-        await delta.finish("请发送 .osu 格式的谱面文件。")
+    if not (file_name.lower().endswith(".osu") or file_name.lower().endswith(".mc")):
+        await delta.finish("请回复 .osu 或 .mc 格式的谱面文件。")
     if not file_url:
         await delta.finish("无法获取文件下载链接。")
 
@@ -206,7 +216,18 @@ async def handle_file(state: T_State, user_file: Message = Arg("user_file")):
         if not success:
             await delta.finish("文件下载失败，请稍后重试。")
             
-        osu = osu_file(osu_path)
+        chart_file = osu_path
+        mc_file = is_mc_file(chart_file)
+        if mc_file:
+            try:
+                # 转换为 .osu 文件
+                osu_file_path = convert_mc_to_osu(str(osu_path), str(CACHE_DIR))
+                chart_file = Path(osu_file_path)
+                file_name = os.path.basename(osu_file_path)
+            except Exception as e:
+                await delta.finish(f".mc 文件转换失败: {e}")
+            
+        osu = osu_file(chart_file)
         osu.process()
         match osu.status:
             case "NotMania":
@@ -229,11 +250,15 @@ async def handle_file(state: T_State, user_file: Message = Arg("user_file")):
         output_path = result
         await delta.finish(MessageSegment.image(f"file://{output_path}"))
     except FinishedException:
+        pass
+    except Exception as e:
+        await delta.send(f"{e}")
+    finally:
         if osr_path and osr_path.exists():
             asyncio.create_task(cleanup_temp_file(osr_path))
         if osu_path and osu_path.exists():
             asyncio.create_task(cleanup_temp_file(osu_path))
         if output_path and Path(output_path).exists():
             asyncio.create_task(cleanup_temp_file(Path(output_path)))    
-    except Exception as e:
-        await delta.send(f"{e}")
+        if chart_file and Path(chart_file).exists():
+            asyncio.create_task(cleanup_temp_file(Path(chart_file)))   

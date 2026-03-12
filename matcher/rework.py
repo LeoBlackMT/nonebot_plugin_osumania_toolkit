@@ -3,6 +3,7 @@ import os
 import aiohttp
 from nonebot import on_command
 from nonebot.adapters.onebot.v11 import MessageEvent
+from nonebot.exception import FinishedException
 from pathlib import Path
 
 from ..file.file import download_file_by_id
@@ -46,7 +47,6 @@ async def handle_rework(event: MessageEvent):
         if not file_ident:
             await rework.finish("文件信息不完整。")
         file_name = os.path.basename(file_ident)
-        # 支持 .osu 和 .mc 文件
         if not (file_name.lower().endswith(".osu") or file_name.lower().endswith(".mc")):
             await rework.finish("请回复 .osu 或 .mc 格式的谱面文件。")
         if not file_url:
@@ -69,13 +69,13 @@ async def handle_rework(event: MessageEvent):
             await rework.finish(f"下载异常：{e}")
 
         # 检查是否为 .mc 文件，如果是则转换为 .osu
-        process_file = tmp_file
-        mc_file = is_mc_file(process_file)
+        chart_file = tmp_file
+        mc_file = is_mc_file(chart_file)
         if mc_file:
             try:
                 # 转换为 .osu 文件
                 osu_file_path = convert_mc_to_osu(str(tmp_file), str(CACHE_DIR))
-                process_file = Path(osu_file_path)
+                chart_file = Path(osu_file_path)
                 file_name = os.path.basename(osu_file_path)
             except Exception as e:
                 await rework.finish(f".mc 文件转换失败: {e}")
@@ -83,10 +83,10 @@ async def handle_rework(event: MessageEvent):
 
         try:
             # 计算星数
-            sr, LN_ratio, column_count = await get_rework_result(str(process_file), speed_rate, od_flag, cvt_flag)
+            sr, LN_ratio, column_count = await get_rework_result(str(chart_file), speed_rate, od_flag, cvt_flag)
             meta_data = parse_osu_filename(file_name)
             if not meta_data:
-                osu_obj = osu_file(process_file)
+                osu_obj = osu_file(chart_file)
                 osu_obj.process()
                 meta_data = osu_obj.meta_data
             await rework.send(get_result_text(meta_data, mod_display, sr, speed_rate, od_flag, LN_ratio, column_count), to_sender=True)
@@ -101,8 +101,8 @@ async def handle_rework(event: MessageEvent):
         finally:
             if tmp_file and tmp_file.exists():
                 tmp_file.unlink()
-            if process_file != tmp_file and process_file.exists():
-                process_file.unlink()
+            if chart_file != tmp_file and chart_file.exists():
+                chart_file.unlink()
         return
     
     elif bid is None:
@@ -111,9 +111,13 @@ async def handle_rework(event: MessageEvent):
     else:
         try:
             tmp_file, file_name = await download_file_by_id(CACHE_DIR,bid)
+            if not tmp_file:
+                await rework.finish(f"未找到谱面: b{bid}")
+                
             sr, LN_ratio, column_count = await get_rework_result(str(tmp_file), speed_rate, od_flag, cvt_flag)
-
             await rework.send(get_result_text(parse_osu_filename(file_name), mod_display, sr, speed_rate, od_flag, LN_ratio, column_count), to_sender=True)
+        except FinishedException:
+            pass
         except Exception as e:
             await rework.send(f"{e}")
         finally:

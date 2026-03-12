@@ -44,6 +44,8 @@ async def handle_lifebar(event: MessageEvent):
     file_name = os.path.basename(file_name)
     if not file_name.lower().endswith(".osr"):
         await lifebar.finish("请回复 .osr 格式的回放文件。")
+    if file_name.lower().endswith(".mr"):
+        await lifebar.finish("该命令不支持Malody格式的回放文件。")
     if not file_url:
         await lifebar.finish("无法获取文件下载链接。")
     

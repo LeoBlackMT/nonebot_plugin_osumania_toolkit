@@ -7,6 +7,7 @@ from nonebot.log import logger
 from ..file.osr_file_parser import osr_file
 from ..file.osu_file_parser import osu_file
 
+
 def match_notes_and_presses(osu: osu_file, osr: osr_file):
     """
     匹配物件和按下事件，返回匹配的列表。
@@ -274,3 +275,24 @@ def is_mc_file(file_path: str) -> bool:
         return True
     except:
         return False
+    
+def malody_mods_to_osu_mods(malody_flags: int) -> int:
+    """
+    将 Malody 的 mods_flags 转换为 osu! 的 mod 整数值。
+    映射规则：
+        bit 2: Luck  -> Random (2097152)
+        bit 3: Flip  -> Mirror (1073741824)
+        bit 6: Rush  -> DoubleTime (64)  (可额外加上 Nightcore? 但 Malody 无区分，只加 DT)
+        bit 7: Hide  -> Hidden (8)
+    其他位忽略。
+    """
+    osu_mod = 0
+    if malody_flags & (1 << 2):   # Luck
+        osu_mod |= 2097152
+    if malody_flags & (1 << 3):   # Flip
+        osu_mod |= 1073741824
+    if malody_flags & (1 << 6):   # Rush
+        osu_mod |= 64   # DoubleTime
+    if malody_flags & (1 << 7):   # Hide
+        osu_mod |= 8    # Hidden
+    return osu_mod

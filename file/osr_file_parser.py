@@ -1,4 +1,3 @@
-import os
 import struct
 import lzma
 import datetime

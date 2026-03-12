@@ -7,9 +7,11 @@ from nonebot.adapters.onebot.v11 import MessageEvent, MessageSegment
 from nonebot.log import logger
 
 from ..file.osr_file_parser import osr_file
+from ..file.mr_file_parser import mr_file
 
 from ..file.draw import plot_spectrum
 from ..file.file import safe_filename, download_file, cleanup_temp_file
+from ..algorithm.convert import convert_mr_to_osr
 
 
 from nonebot_plugin_localstore import get_plugin_cache_dir
@@ -22,7 +24,7 @@ spectrum = on_command("spectrum", aliases={"频谱"})
 @spectrum.handle()
 async def handle_spectrum(event: MessageEvent):
     if not event.reply:
-        await spectrum.finish("请回复一条包含 .osr 文件的消息。")
+        await spectrum.finish("请回复一条包含回放文件的消息。")
 
     reply = event.reply
     file_seg = None
@@ -42,8 +44,8 @@ async def handle_spectrum(event: MessageEvent):
     if not file_url:
         await spectrum.finish("无法获取文件下载链接。")
     file_name = os.path.basename(file_name)
-    if not file_name.lower().endswith(".osr"):
-        await spectrum.finish("请回复 .osr 格式的回放文件。")
+    if not (file_name.lower().endswith(".osr") and file_name.lower().endwith(".mr")) :
+        await spectrum.finish("请回复 .osr 或 .mr 格式的回放文件。")
     if not file_url:
         await spectrum.finish("无法获取文件下载链接。")
     
@@ -58,8 +60,12 @@ async def handle_spectrum(event: MessageEvent):
             await spectrum.send("文件下载失败，请稍后重试。")
             return
 
-        data = osr_file(file_path)
-        data.process()
+        if file_name.lower().endswith(".mr"):
+            data = convert_mr_to_osr(mr_file(file_path))
+        else:
+            data = osr_file(file_path)
+            data.process()
+            
         match data.status:
             case "NotMania":
                 await spectrum.send("该回放不是 Mania 模式。")
