@@ -3,7 +3,7 @@ import os
 import datetime
 
 from collections import Counter
-from typing import List, Optional
+from typing import Optional
 from nonebot.log import logger
 
 from ..algorithm.utils import malody_mods_to_osu_mods
@@ -11,6 +11,15 @@ from ..algorithm.utils import malody_mods_to_osu_mods
 from ..file.osr_file_parser import osr_file, ReplayEvent
 from ..file.mr_file_parser import mr_file
 
+# 辅助函数
+def ms(beats, bpm, offset):
+    return 1000 * (60 / bpm) * beats + offset
+
+def beat(beat_arr):
+    return beat_arr[0] + beat_arr[1] / beat_arr[2]
+
+def col(column, keys):
+    return int(512 * (2 * column + 1) / (2 * keys))
 
 def convert_mc_to_osu(mc_file_path: str, output_dir: Optional[str] = None) -> str:
     """
@@ -27,138 +36,91 @@ def convert_mc_to_osu(mc_file_path: str, output_dir: Optional[str] = None) -> st
         ValueError: 如果文件不是有效的 .mc 文件
         Exception: 转换过程中的其他错误
     """
-    # 检查文件是否存在
+    # 检查文件
     if not os.path.exists(mc_file_path):
         raise FileNotFoundError(f"文件不存在: {mc_file_path}")
-    
-    # 检查文件扩展名
     if not mc_file_path.lower().endswith('.mc'):
         raise ValueError(f"文件不是 .mc 格式: {mc_file_path}")
-    
-    # 读取 .mc 文件
+
+    # 读取 JSON
     try:
         with open(mc_file_path, 'r', encoding='utf-8') as f:
             mc_data = json.load(f)
     except json.JSONDecodeError as e:
         raise ValueError(f"无效的 JSON 格式: {e}")
-    except Exception as e:
-        raise Exception(f"读取文件失败: {e}")
-    
-    # 验证 .mc 文件格式
+
+    # 验证基础字段
     if 'meta' not in mc_data:
         raise ValueError("无效的 .mc 文件: 缺少 'meta' 字段")
-    
     meta = mc_data['meta']
-    
-    # 检查是否为 Key 模式 (mode 0)
     if meta.get('mode') != 0:
         raise ValueError("只支持 Key 模式 (mode 0) 的 .mc 文件")
-    
-    # 获取必要字段
+
     if 'mode_ext' not in meta or 'column' not in meta['mode_ext']:
         raise ValueError("无效的 .mc 文件: 缺少 'mode_ext.column' 字段")
-    
     keys = meta['mode_ext']['column']
-    
-    # 获取时间点信息
+
     if 'time' not in mc_data or not mc_data['time']:
         raise ValueError("无效的 .mc 文件: 缺少 'time' 字段或为空")
-    
-    time_data = mc_data['time']
-    
-    # 获取音符数据
+    line = mc_data['time']
+
     if 'note' not in mc_data:
         raise ValueError("无效的 .mc 文件: 缺少 'note' 字段")
-    
-    note_data = mc_data['note']
-    
-    # 获取音效数据（如果有）
-    sound_data = None
-    for note in note_data:
-        if note.get('type', 0) != 0:
-            sound_data = note
+    note = mc_data['note']
+
+    effect = mc_data.get('effect', [])
+
+    # 提取音效 note（type != 0 的第一个）
+    soundnote = {}
+    for n in note:
+        if n.get('type', 0) != 0:
+            soundnote = n
             break
-    
-    # 获取效果数据（SV，如果有）
-    sv_data = mc_data.get('effect', [])
-    
-    # 计算 BPM 和偏移
-    bpm_list = []
-    bpm_offset_list = []
-    
-    # 辅助函数：将节拍转换为浮点数
-    def beat_to_float(beat: List[int]) -> float:
-        """将 [measure, nth_beat, divisor] 转换为浮点数"""
-        return beat[0] + beat[1] / beat[2]
-    
-    # 辅助函数：将节拍转换为毫秒
-    def beat_to_ms(beat: List[int], bpm: float, offset: float) -> float:
-        """将节拍转换为毫秒"""
-        beats = beat_to_float(beat)
-        return 1000 * (60 / bpm) * beats + offset
-    
-    # 初始化第一个 BPM
-    first_bpm = time_data[0]['bpm']
-    bpm_list.append(first_bpm)
-    bpm_offset_list.append(-sound_data.get('offset', 0) if sound_data else 0)
-    
-    # 计算其他 BPM 点
-    if len(time_data) > 1:
-        last_beat = time_data[0]['beat']
-        for i in range(1, len(time_data)):
-            current_beat = time_data[i]['beat']
-            current_bpm = time_data[i]['bpm']
-            
-            bpm_list.append(current_bpm)
-            bpm_offset = beat_to_ms(
-                current_beat, 
-                time_data[i-1]['bpm'], 
-                bpm_offset_list[i-1]
-            ) - beat_to_ms(
-                last_beat,
-                time_data[i-1]['bpm'],
-                bpm_offset_list[i-1]
-            )
-            bpm_offset_list.append(bpm_offset_list[i-1] + bpm_offset)
-            
-            last_beat = current_beat
-    
-    # 获取元数据
-    title = meta['song']['title']
-    artist = meta['song']['artist']
-    creator = meta['creator']
-    version = meta['version']
-    background = meta.get('background', '')
-    
-    # 获取原始标题和艺术家（如果有）
+
+    # 计算 BPM 和偏移（完全照搬 ref.py 的累积算法）
+    bpm = [line[0]['bpm']]
+    bpmoffset = [-soundnote.get('offset', 0)]  # 初始偏移
+
+    if len(line) > 1:
+        j = 0
+        lastbeat = line[0]['beat']
+        for x in line[1:]:
+            bpm.append(x['bpm'])
+            # 计算绝对时间偏移
+            offset = ms(beat(x['beat']) - beat(lastbeat), line[j]['bpm'], bpmoffset[j])
+            bpmoffset.append(offset)
+            j += 1
+            lastbeat = x['beat']
+
+    bpmcount = len(bpm)
+
+    # 元数据
+    title = meta["song"]["title"]
+    artist = meta["song"]["artist"]
+    creator = meta["creator"]
+    version = meta["version"]
+    background = meta.get("background", "")
+    preview = meta.get("preview", -1)
     title_org = meta['song'].get('titleorg', title)
     artist_org = meta['song'].get('artistorg', artist)
-    
-    # 获取预览时间
-    preview_time = meta.get('preview', -1)
-    
-    # 获取音效文件名
-    sound_file = sound_data.get('sound', '') if sound_data else ''
-    
-    # 确定输出路径
+    sound_file = soundnote.get('sound', '') if soundnote else ''
+
+    # 输出路径
     if output_dir is None:
         output_dir = os.path.dirname(mc_file_path)
-    
-    output_path = os.path.join(
-        output_dir, 
-        f"{os.path.splitext(os.path.basename(mc_file_path))[0]}.osu"
-    )
-    
-    # 生成 .osu 文件内容
-    osu_lines = [
+    base_name = os.path.splitext(os.path.basename(mc_file_path))[0]
+    output_path = os.path.join(output_dir, f"{base_name}.osu")
+
+    # 构建 .osu 内容
+    lines = [
         'osu file format v14',
         '',
         '[General]',
         f'AudioFilename: {sound_file}',
         'AudioLeadIn: 0',
-        f'PreviewTime: {preview_time}',
+        f'PreviewTime: {preview}',
         'Countdown: 0',
-        'SampleSet: None',
+        'SampleSet: Soft',
         'StackLeniency: 0.7',
         'Mode: 3',
         'LetterboxInBreaks: 0',
@@ -186,7 +148,7 @@ def convert_mc_to_osu(mc_file_path: str, output_dir: Optional[str] = None) -> st
         '[Difficulty]',
         'HPDrainRate:8',
         f'CircleSize:{keys}',
-        'OverallDifficulty:8',
+        'OverallDifficulty:8', # 默认od8
         'ApproachRate:5',
         'SliderMultiplier:1.4',
         'SliderTickRate:1',
@@ -197,106 +159,77 @@ def convert_mc_to_osu(mc_file_path: str, output_dir: Optional[str] = None) -> st
         '',
         '[TimingPoints]'
     ]
-    
-    # 添加 Timing Points
-    for i in range(len(bpm_list)):
-        beat_signature = time_data[i].get('sign', 4)
-        osu_lines.append(f'{int(bpm_offset_list[i])},{60000/bpm_list[i]},{beat_signature},1,0,0,1,0')
-    
-    # 添加 SV 点（如果有）
-    if sv_data:
-        for sv in sv_data:
-            # 找到对应的 BPM 段
-            sv_beat = beat_to_float(sv['beat'])
-            bpm_index = 0
-            
-            for j in range(len(time_data)):
-                if beat_to_float(time_data[j]['beat']) > sv_beat:
-                    bpm_index = j
-                    break
-            
-            # 计算 SV 点的时间
-            sv_time = beat_to_ms(
-                sv['beat'],
-                bpm_list[bpm_index],
-                bpm_offset_list[bpm_index]
-            )
-            
-            # 计算 SV 值（滚动速度）
-            scroll = sv.get('scroll', 1.0)
-            if scroll == 0:
-                sv_value = "1E+308"  # 无限大
-            else:
-                sv_value = 100 / abs(scroll)
-            
-            osu_lines.append(f'{int(sv_time)},-{sv_value},{time_data[bpm_index].get("sign", 4)},1,0,0,0,0')
-    
-    osu_lines.append('')
-    osu_lines.append('[HitObjects]')
-    
-    # 添加 HitObjects
-    for note in note_data:
-        # 跳过音效数据
-        if note.get('type', 0) != 0:
-            continue
-        
-        # 找到对应的 BPM 段
-        note_beat = beat_to_float(note['beat'])
-        bpm_index = 0
-        
-        for j in range(len(time_data)):
-            if beat_to_float(time_data[j]['beat']) > note_beat:
-                bpm_index = j
+
+    # 红色 Timing Points（BPM 点）
+    for i in range(bpmcount):
+        meter = line[i].get('sign', 4)
+        lines.append(f'{int(bpmoffset[i])},{60000 / bpm[i]},{meter},1,0,0,1,0')
+
+    # 绿色 Timing Points（SV 点）
+    for sv in effect:
+        sv_beat = beat(sv['beat'])
+        # 找到所属 BPM 段（最后一个节拍 ≤ sv_beat 的段）
+        idx = 0
+        for i, b in enumerate(line):
+            if beat(b['beat']) > sv_beat:
                 break
-        
-        # 计算音符时间
-        note_time = beat_to_ms(
-            note['beat'],
-            bpm_list[bpm_index],
-            bpm_offset_list[bpm_index]
-        )
-        
-        # 计算列位置
-        column = note['column']
-        x_position = int(512 * (2 * column + 1) / (2 * keys))
-        
-        # 检查是否为长按音符
-        if 'endbeat' in note:
-            # 长按音符
-            end_beat = beat_to_float(note['endbeat'])
-            end_bpm_index = 0
-            
-            for j in range(len(time_data)):
-                if beat_to_float(time_data[j]['beat']) > end_beat:
-                    end_bpm_index = j
+            idx = i
+        delta_beat = sv_beat - beat(line[idx]['beat'])
+        sv_time = ms(delta_beat, bpm[idx], bpmoffset[idx])
+        scroll = sv.get('scroll', 1.0)
+        sv_value = "1E+308" if scroll == 0 else 100 / abs(scroll)
+        meter = line[idx].get('sign', 4)
+        lines.append(f'{int(sv_time)},-{sv_value},{meter},1,0,0,0,0')
+
+    lines.append('')
+    lines.append('[HitObjects]')
+
+    # 音符
+    for n in note:
+        if n.get('type', 0) != 0:
+            continue  # 跳过音效
+
+        n_beat = beat(n['beat'])
+        # 找到所属 BPM 段
+        idx = 0
+        for i, b in enumerate(line):
+            if beat(b['beat']) > n_beat:
+                break
+            idx = i
+        delta_beat = n_beat - beat(line[idx]['beat'])
+        n_time = ms(delta_beat, bpm[idx], bpmoffset[idx])
+        x = col(n['column'], keys)
+
+        # 长按或普通
+        if 'endbeat' in n:
+            end_beat = beat(n['endbeat'])
+            idx_end = 0
+            for i, b in enumerate(line):
+                if beat(b['beat']) > end_beat:
                     break
-            
-            # 计算结束时间
-            end_time = beat_to_ms(
-                note['endbeat'],
-                bpm_list[end_bpm_index],
-                bpm_offset_list[end_bpm_index]
-            )
-            
-            # 长按音符格式: x,y,time,type,hitSound,endTime:extras
-            hit_sound = note.get('sound', 0)
-            volume = note.get('vol', 100)
-            
-            osu_lines.append(f'{x_position},192,{int(note_time)},128,0,{int(end_time)}:0:0:0:{volume}:{hit_sound}')
+                idx_end = i
+            delta_end = end_beat - beat(line[idx_end]['beat'])
+            end_time = ms(delta_end, bpm[idx_end], bpmoffset[idx_end])
+            type_str = '128'
+            extra = f',0,{int(end_time)}:0:0:0:'
         else:
-            # 普通音符
-            hit_sound = note.get('sound', 0)
-            volume = note.get('vol', 100)
-            
-            osu_lines.append(f'{x_position},192,{int(note_time)},1,0,0:0:0:0:{volume}:{hit_sound}')
-    
+            type_str = '1'
+            extra = ',0,0:0:0:'
+
+        vol = n.get('vol', 100)
+        sound = n.get('sound', 0)
+        extra += f'{vol}:{sound}'
+
+        line_str = f'{x},192,{int(n_time)},{type_str},0,0,{extra}'
+        lines.append(line_str)
+
     # 写入文件
     try:
         with open(output_path, 'w', encoding='utf-8') as f:
-            f.write('\n'.join(osu_lines))
+            f.write('\n'.join(lines))
     except Exception as e:
         raise Exception(f"写入 .osu 文件失败: {e}")
-    
+
     return output_path
 
 def convert_mr_to_osr(mr_obj: mr_file) -> osr_file:
