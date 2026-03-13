@@ -67,7 +67,7 @@ async def handle_first(event: MessageEvent, state: T_State):
         state["status"] = "Fail"
         await delta.finish("无法获取文件下载链接。")
     file_name = os.path.basename(file_name)
-    if not (file_name.lower().endswith(".osr") or file_name.lower().endwith(".mr")) :
+    if not (file_name.lower().endswith(".osr") or file_name.lower().endswith(".mr")) :
         state["status"] = "Fail"
         await delta.finish("请回复 .osr 或 .mr 格式的回放文件。")
     if not file_url:
