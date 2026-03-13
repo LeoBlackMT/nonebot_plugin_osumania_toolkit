@@ -3,13 +3,13 @@ import asyncio
 from pathlib import Path
 
 from nonebot import on_command
-from nonebot.adapters.onebot.v11 import MessageEvent, MessageSegment
+from nonebot.adapters.onebot.v11 import Bot, MessageEvent, MessageSegment
 from nonebot.log import logger
 
 from ..file.osr_file_parser import osr_file
 
 from ..file.draw import plot_life
-from ..file.file import safe_filename, download_file, cleanup_temp_file
+from ..file.file import safe_filename, download_file, cleanup_temp_file, get_file_url
 
 
 from nonebot_plugin_localstore import get_plugin_cache_dir
@@ -20,7 +20,7 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 lifebar = on_command("lifebar", aliases={"血条"})
 
 @lifebar.handle()
-async def handle_lifebar(event: MessageEvent):
+async def handle_lifebar(bot: Bot, event: MessageEvent):
     if not event.reply:
         await lifebar.finish("请回复一条包含 .osr 文件的消息。")
 
@@ -34,21 +34,18 @@ async def handle_lifebar(event: MessageEvent):
     if not file_seg:
         await lifebar.finish("回复的消息中没有找到文件。")
 
-    file_name = file_seg.data.get("file", "")
-    file_url = file_seg.data.get("url", "")
-    
-    if not file_name:
-        await lifebar.finish("无法获取文件名。")
-    if not file_url:
-        await lifebar.finish("无法获取文件下载链接。")
+    # 使用辅助函数获取文件信息
+    file_info = await get_file_url(bot, file_seg)
+    if not file_info:
+        await lifebar.finish("无法获取文件信息。请确保机器人有权限访问该文件，或者文件链接有效。")
+
+    file_name, file_url = file_info
     file_name = os.path.basename(file_name)
     if not file_name.lower().endswith(".osr"):
         await lifebar.finish("请回复 .osr 格式的回放文件。")
     if file_name.lower().endswith(".mr"):
         await lifebar.finish("该命令不支持Malody格式的回放文件。")
-    if not file_url:
-        await lifebar.finish("无法获取文件下载链接。")
-    
+
     await lifebar.send(f"已收到文件：{file_name}，请稍候...")
 
     safe_name = safe_filename(file_name)

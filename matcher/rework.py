@@ -2,11 +2,11 @@ import os
 
 import aiohttp
 from nonebot import on_command
-from nonebot.adapters.onebot.v11 import MessageEvent
+from nonebot.adapters.onebot.v11 import Bot, MessageEvent
 from nonebot.exception import FinishedException
 from pathlib import Path
 
-from ..file.file import download_file_by_id
+from ..file.file import download_file_by_id, get_file_url
 from ..file.osu_file_parser import osu_file
 from ..algorithm.rework import get_result_text, get_rework_result, parse_osu_filename, process_zip_file
 from ..algorithm.utils import parse_cmd, is_mc_file
@@ -20,7 +20,7 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 rework = on_command("rework", block=True)
 
 @rework.handle()
-async def handle_rework(event: MessageEvent):
+async def handle_rework(bot: Bot, event: MessageEvent):
 
     cmd_text = event.get_plaintext().strip()
     speed_rate, od_flag, cvt_flag, bid, mod_display, err_msg = parse_cmd(cmd_text)
@@ -41,17 +41,16 @@ async def handle_rework(event: MessageEvent):
         if not file_seg:
             await rework.finish("回复的消息中没有找到文件。")
 
-        # 获取文件信息
-        file_ident = file_seg.data.get("file", "")
-        file_url = file_seg.data.get("url", "")
-        if not file_ident:
-            await rework.finish("文件信息不完整。")
-        file_name = os.path.basename(file_ident)
-        if not (file_name.lower().endswith(".osu") or file_name.lower().endswith(".mc") or 
+        # 使用辅助函数获取文件信息
+        file_info = await get_file_url(bot, file_seg)
+        if not file_info:
+            await rework.finish("无法获取文件信息。请确保机器人有权限访问该文件，或者文件链接有效。")
+
+        file_name, file_url = file_info
+        file_name = os.path.basename(file_name)
+        if not (file_name.lower().endswith(".osu") or file_name.lower().endswith(".mc") or
                 file_name.lower().endswith(".osz") or file_name.lower().endswith(".mcz")):
             await rework.finish("请回复 .osu/.mc 格式的谱面文件。")
-        if not file_url:
-            await rework.finish("无法获取文件下载链接。")
 
         tmp_file = CACHE_DIR / file_name
 

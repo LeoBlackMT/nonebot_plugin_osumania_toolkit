@@ -3,13 +3,18 @@ import os
 import numpy as np
 import asyncio
 import traceback
+import gc
+
+# 必须在导入 pyplot 之前设置后端，避免 tkinter 线程安全问题
+import matplotlib
+matplotlib.use('Agg')  # 使用非交互式后端
 
 from matplotlib import pyplot as plt
 from matplotlib import colors
 from scipy.fft import fft, fftfreq
-from functools import partial
+from functools import partial, wraps
 
-# 中文字体 
+# 中文字体
 # plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'WenQuanYi Zen Hei', 'Noto Sans CJK SC']
 plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
 
@@ -18,17 +23,39 @@ from ..file.osu_file_parser import osu_file
 
 from ..algorithm.utils import match_notes_and_presses
 
+
+def safe_plot(func):
+    """
+    装饰器：确保绘图函数即使出错也能正确清理资源
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        finally:
+            # 关闭所有打开的图形，释放资源
+            plt.close('all')
+            # 强制垃圾回收，清理 matplotlib 对象
+            gc.collect()
+    return wrapper
+
+
 async def run_plot_comprehensive(output_dir: str, osr_obj: osr_file, osu_obj: osu_file=None):
     loop = asyncio.get_running_loop()
     def wrapped():
         try:
             return plot_comprehensive(output_dir, osr_obj, osu_obj=osu_obj)
-        except Exception as e:        
+        except Exception as e:
             traceback.print_exc()
             raise
+        finally:
+            # 确保清理资源
+            plt.close('all')
+            gc.collect()
     img_path = await loop.run_in_executor(None, wrapped)
     return img_path
 
+@safe_plot
 def plot_pressingtime(osr_obj: osr_file, output_dir: str) -> str:
     """
     绘制按压时长分布图（各轨道颜色区分）
@@ -120,6 +147,7 @@ def plot_pressingtime(osr_obj: osr_file, output_dir: str) -> str:
     plt.close()
     return output_path
 
+@safe_plot
 def plot_delta(osr_obj: osr_file, osu_obj: osu_file, output_dir: str):
     """
     绘制 delta_t 分布直方图（按列着色）
@@ -164,6 +192,7 @@ def plot_delta(osr_obj: osr_file, osu_obj: osu_file, output_dir: str):
     plt.close()
     return output_path
 
+@safe_plot
 def plot_spectrum(osr_obj: osr_file, output_dir: str) -> str:
     """
     生成脉冲序列频谱图
@@ -216,6 +245,7 @@ def plot_spectrum(osr_obj: osr_file, output_dir: str) -> str:
     plt.close()
     return output_path
 
+@safe_plot
 def plot_scatter(osr_obj: osr_file, osu_obj: osu_file, output_dir: str) -> str:
     """
     绘制 delta_t 散点图（横坐标为物件时间，纵坐标为玩家按下时间与物件时间的差值）
@@ -252,6 +282,7 @@ def plot_scatter(osr_obj: osr_file, osu_obj: osu_file, output_dir: str) -> str:
     plt.close()
     return output_path
 
+@safe_plot
 def plot_life(osr_obj: osr_file, output_dir: str) -> str:
     """
     绘制玩家血量随时间变化图
@@ -301,6 +332,7 @@ def plot_life(osr_obj: osr_file, output_dir: str) -> str:
     plt.close()
     return output_path
 
+@safe_plot
 def plot_comprehensive(output_dir: str, osr_obj: osr_file, osu_obj: osu_file = None) -> str:
     """
     综合绘图：

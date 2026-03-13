@@ -3,14 +3,14 @@ import asyncio
 from pathlib import Path
 
 from nonebot import on_command
-from nonebot.adapters.onebot.v11 import MessageEvent, MessageSegment
+from nonebot.adapters.onebot.v11 import Bot, MessageEvent, MessageSegment
 from nonebot.log import logger
 
 from ..file.osr_file_parser import osr_file
 from ..file.mr_file_parser import mr_file
 
 from ..file.draw import plot_spectrum
-from ..file.file import safe_filename, download_file, cleanup_temp_file
+from ..file.file import safe_filename, download_file, cleanup_temp_file, get_file_url
 from ..algorithm.convert import convert_mr_to_osr
 
 
@@ -22,7 +22,7 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 spectrum = on_command("spectrum", aliases={"频谱"})
 
 @spectrum.handle()
-async def handle_spectrum(event: MessageEvent):
+async def handle_spectrum(bot: Bot, event: MessageEvent):
     if not event.reply:
         await spectrum.finish("请回复一条包含回放文件的消息。")
 
@@ -36,19 +36,16 @@ async def handle_spectrum(event: MessageEvent):
     if not file_seg:
         await spectrum.finish("回复的消息中没有找到文件。")
 
-    file_name = file_seg.data.get("file", "")
-    file_url = file_seg.data.get("url", "")
-    
-    if not file_name:
-        await spectrum.finish("无法获取文件名。")
-    if not file_url:
-        await spectrum.finish("无法获取文件下载链接。")
+    # 使用辅助函数获取文件信息
+    file_info = await get_file_url(bot, file_seg)
+    if not file_info:
+        await spectrum.finish("无法获取文件信息。请确保机器人有权限访问该文件，或者文件链接有效。")
+
+    file_name, file_url = file_info
     file_name = os.path.basename(file_name)
     if not (file_name.lower().endswith(".osr") or file_name.lower().endswith(".mr")) :
         await spectrum.finish("请回复 .osr 或 .mr 格式的回放文件。")
-    if not file_url:
-        await spectrum.finish("无法获取文件下载链接。")
-    
+
     await spectrum.send(f"已收到文件：{file_name}，请稍候...")
 
     safe_name = safe_filename(file_name)

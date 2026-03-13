@@ -2,7 +2,7 @@ import os
 import asyncio
 from pathlib import Path
 
-from nonebot.adapters.onebot.v11 import MessageEvent, MessageSegment, Message
+from nonebot.adapters.onebot.v11 import Bot, MessageEvent, MessageSegment, Message
 from nonebot.typing import T_State
 from nonebot.exception import FinishedException
 from nonebot import on_command
@@ -14,7 +14,7 @@ from ..file.osr_file_parser import osr_file
 from ..file.mr_file_parser import mr_file
 
 from ..file.draw import run_plot_comprehensive
-from ..file.file import safe_filename, download_file, download_file_by_id, cleanup_temp_file
+from ..file.file import safe_filename, download_file, download_file_by_id, cleanup_temp_file, get_file_url
 from ..algorithm.utils import parse_cmd, is_mc_file
 from ..algorithm.cheat_analyze import run_analyze_cheating
 from ..algorithm.convert import convert_mr_to_osr, convert_mc_to_osu
@@ -25,7 +25,7 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 analyze = on_command("analyze", aliases={"分析"}, block= True)
 
 @analyze.handle()
-async def handle_first(event: MessageEvent, state: T_State):
+async def handle_first(bot: Bot, event: MessageEvent, state: T_State):
     
     state["status"] = "init"
     
@@ -55,40 +55,36 @@ async def handle_first(event: MessageEvent, state: T_State):
         state["status"] = "Fail"
         await analyze.finish("回复的消息中没有找到文件。")
 
-    file_name = file_seg.data.get("file", "")
-    file_url = file_seg.data.get("url", "")
-    
-    if not file_name:
+    # 使用辅助函数获取文件信息
+    file_info = await get_file_url(bot, file_seg)
+    if not file_info:
         state["status"] = "Fail"
-        await analyze.finish("无法获取文件名。")
-    if not file_url:
-        state["status"] = "Fail"
-        await analyze.finish("无法获取文件下载链接。")
+        await analyze.finish("无法获取文件信息。请确保机器人有权限访问该文件，或者文件链接有效。")
+
+    file_name, file_url = file_info
     file_name = os.path.basename(file_name)
     if not (file_name.lower().endswith(".osr") or file_name.lower().endswith(".mr")) :
         state["status"] = "Fail"
         await analyze.finish("请回复 .osr 或 .mr 格式的回放文件。")
-    if not file_url:
-        state["status"] = "Fail"
-        await analyze.finish("无法获取文件下载链接。")
 
     osr_path = CACHE_DIR / safe_filename(file_name)
     state["osr_path"] = osr_path
     file_err_msg = []
-    
+    osr = None
+
     try:
         success = await download_file(file_url, osr_path)
         if not success:
             state["status"] = "Fail"
             await analyze.finish("文件下载失败，请稍后重试。")
-            
+
         if file_name.lower().endswith(".mr"):
             state["status"] = "Malody"
             osr = convert_mr_to_osr(mr_file(osr_path))
         else:
             osr = osr_file(osr_path)
             osr.process()
-        
+
         match osr.status:
             case "NotMania":
                 file_err_msg.append("该回放不是 Mania 模式。")
@@ -100,14 +96,15 @@ async def handle_first(event: MessageEvent, state: T_State):
                 pass
 
     except FinishedException:
-        pass
+        raise
     except Exception as e:
         state["status"] = "Fail"
         await analyze.send(f"处理过程中发生错误：{type(e).__name__}: {e}")
+        return
     finally:
         if osr_path and osr_path.exists():
             asyncio.create_task(cleanup_temp_file(osr_path))
-    
+
     state["osr"] = osr
     
     # 分支判断
@@ -173,7 +170,7 @@ async def handle_first(event: MessageEvent, state: T_State):
         return
 
 @analyze.got("user_file")
-async def handle_file(state: T_State, user_msg: Message = Arg("user_file")):
+async def handle_file(bot: Bot, state: T_State, user_msg: Message = Arg("user_file")):
     # 从 state 中获取之前存储的对象
     osr = state["osr"]
     osr_path = state["osr_path"]
@@ -234,10 +231,11 @@ async def handle_file(state: T_State, user_msg: Message = Arg("user_file")):
             await analyze.reject("输入无效，请发送谱面文件，或输入 1 跳过，输入 0 取消。")
     else:
         # 处理用户发送的 .osu 文件
-        file_name = file_seg.data.get("file", "")
-        file_url = file_seg.data.get("url", "")
-        if not file_name or not file_url:
-            await analyze.finish("文件信息不完整。")
+        file_info = await get_file_url(bot, file_seg)
+        if not file_info:
+            await analyze.finish("无法获取文件信息。请确保机器人有权限访问该文件，或者文件链接有效。")
+
+        file_name, file_url = file_info
         file_name = os.path.basename(file_name)
         if not (file_name.lower().endswith(".osu") or file_name.lower().endswith(".mc")):
             await analyze.finish("请发送 .osu 或 .mc 格式的谱面文件。")

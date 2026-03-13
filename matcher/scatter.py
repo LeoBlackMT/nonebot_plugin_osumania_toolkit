@@ -2,7 +2,7 @@ import os
 import asyncio
 from pathlib import Path
 
-from nonebot.adapters.onebot.v11 import MessageEvent, MessageSegment, Message
+from nonebot.adapters.onebot.v11 import Bot, MessageEvent, MessageSegment, Message
 from nonebot.typing import T_State
 from nonebot.exception import FinishedException
 from nonebot import on_command
@@ -14,7 +14,7 @@ from ..file.osr_file_parser import osr_file
 from ..file.mr_file_parser import mr_file
 
 from ..file.draw import plot_scatter
-from ..file.file import safe_filename, download_file, download_file_by_id, cleanup_temp_file
+from ..file.file import safe_filename, download_file, download_file_by_id, cleanup_temp_file, get_file_url
 from ..algorithm.utils import parse_cmd, is_mc_file
 from ..algorithm.convert import convert_mr_to_osr, convert_mc_to_osu
 
@@ -24,7 +24,7 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 scatter = on_command("scatter", aliases={"散点"})
 
 @scatter.handle()
-async def handle_first(event: MessageEvent, state: T_State):
+async def handle_first(bot: Bot, event: MessageEvent, state: T_State):
     
     state["status"] = "init"
     
@@ -57,22 +57,17 @@ async def handle_first(event: MessageEvent, state: T_State):
         state["status"] = "Fail"
         await scatter.finish("回复的消息中没有找到文件。")
 
-    file_name = file_seg.data.get("file", "")
-    file_url = file_seg.data.get("url", "")
-    
-    if not file_name:
+    # 使用辅助函数获取文件信息
+    file_info = await get_file_url(bot, file_seg)
+    if not file_info:
         state["status"] = "Fail"
-        await scatter.finish("无法获取文件名。")
-    if not file_url:
-        state["status"] = "Fail"
-        await scatter.finish("无法获取文件下载链接。")
+        await scatter.finish("无法获取文件信息。请确保机器人有权限访问该文件，或者文件链接有效。")
+
+    file_name, file_url = file_info
     file_name = os.path.basename(file_name)
     if not (file_name.lower().endswith(".osr") or file_name.lower().endswith(".mr")) :
         state["status"] = "Fail"
         await scatter.finish("请回复 .osr 或 .mr 格式的回放文件。")
-    if not file_url:
-        state["status"] = "Fail"
-        await scatter.finish("无法获取文件下载链接。")
 
     osr_path = CACHE_DIR / safe_filename(file_name)
     state["osr_path"] = osr_path
@@ -165,7 +160,7 @@ async def handle_first(event: MessageEvent, state: T_State):
         return
 
 @scatter.got("user_file")
-async def handle_file(state: T_State, user_file: Message = Arg("user_file")):
+async def handle_file(bot: Bot, state: T_State, user_file: Message = Arg("user_file")):
     
     osr_path = state["osr_path"]
     osu_path = None
@@ -193,14 +188,12 @@ async def handle_file(state: T_State, user_file: Message = Arg("user_file")):
     if not file_seg:
         await scatter.finish("未找到谱面文件，操作已取消。")
 
-    
-    file_name = file_seg.data.get("file", "")
-    file_url = file_seg.data.get("url", "")
-    
-    if not file_name:
-        await scatter.finish("无法获取文件名。")
-    if not file_url:
-        await scatter.finish("无法获取文件下载链接。")
+    # 使用辅助函数获取文件信息
+    file_info = await get_file_url(bot, file_seg)
+    if not file_info:
+        await scatter.finish("无法获取文件信息。请确保机器人有权限访问该文件，或者文件链接有效。")
+
+    file_name, file_url = file_info
     file_name = os.path.basename(file_name)
     if not (file_name.lower().endswith(".osu") or file_name.lower().endswith(".mc")):
         await scatter.finish("请回复 .osu 或 .mc 格式的谱面文件。")
