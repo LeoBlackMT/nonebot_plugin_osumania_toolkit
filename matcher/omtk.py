@@ -2,7 +2,26 @@ from nonebot import on_command
 from nonebot.adapters.onebot.v11 import MessageEvent
 from nonebot.exception import FinishedException
 
+from ..algorithm.acc_calculate import get_available_dans
+
 omtk = on_command("omtk")
+
+def format_dan_list(dans: list, items_per_line: int = 5) -> str:
+    """
+    格式化段位列表，每行显示指定数量的段位
+    
+    参数:
+        dans: 段位名列表
+        items_per_line: 每行显示的段位数量
+    
+    返回:
+        格式化后的字符串
+    """
+    formatted_lines = []
+    for i in range(0, len(dans), items_per_line):
+        line = dans[i:i + items_per_line]
+        formatted_lines.append(", ".join(line))
+    return "\n".join(formatted_lines)
 
 # 命令别名映射
 command_aliases = {
@@ -11,12 +30,13 @@ command_aliases = {
     "偏差": "delta",
     "血条": "lifebar",
     "频谱": "spectrum",
-    "散点": "scatter"
+    "散点": "scatter",
+    "单曲": "acc"
 }
 
 # help_text 结构: (命令, 命令名称, 页码, 总页码, 帮助文本)
 help_text = [("rework", "星数重算", "1", "2",
-              "你可以回复包含 .osu/.mr 文件的消息，或回复包含 .osz/.mcz 的消息，或使用 bid 指定谱面。\n命令格式：/rework b<bid> +[mods] x[speed] OD[OD] gap:[gap] \n示例：/rework b4094064 +EZHO x1.25\n/rework b4094064 +IN OD8 gap:50\n警告：图包分析开销较大，请勿滥用。结果将发送大量文字，谨防刷屏。\n注意：1. 如果你回复了一个包含谱面/图包文件的消息，命令将忽略bid。\n2. 部分模组和参数冲突。"),
+              "你可以回复包含 .osu/.mc 文件的消息，或回复包含 .osz/.mcz 的消息，或使用 bid 指定谱面。\n命令格式：/rework b<bid> +[mods] x[speed] OD[OD] gap:[gap] \n示例：/rework b4094064 +EZHO x1.25\n/rework b4094064 +IN OD8 gap:50\n警告：图包分析开销较大，请勿滥用。结果将发送大量文字，谨防刷屏。\n注意：1. 如果你回复了一个包含谱面/图包文件的消息，命令将忽略bid。\n2. 部分模组和参数冲突。"),
              
              ("rework", "星数重算", "2", "2",
               "/rework参数说明：\n- bid: 以 b 开头，后跟整数，从官网获取谱面。\n- mods: 以 + 开头，后跟模组名缩写（支持 HR/EZ、DT/HT、IN/HO、DC/NC）。不区分大小写，格式如雨沐。\n- speed: 以 x 或 * 开头，后跟倍速数值（如 x1.5）。倍速必须在 0.25 到 3.0 之间。\n- OD: 以 OD 开头, OD值必须在 -15 到 15 之间。\n- gap: 反键面缝参数，以 gap: 开头，后跟整数，单位ms, 默认150， 仅在 IN 模组启用时有效。"),
@@ -40,7 +60,14 @@ help_text = [("rework", "星数重算", "1", "2",
               "你可以使用/spectrum (/频谱)命令来显示一个回放的打击频谱图表。\n用法：回复包含 .osr/.mr 文件的消息，然后发送 /spectrum 命令。"),
              
              ("scatter", "散点图", "1", "1",
-              "你可以使用/scatter (/散点)回复包含 .osr/.mr 文件的消息的同时使用 bid 指定谱面，来显示打击位置的二维散点图。\n命令格式：/scatter [b<bid>]\n示例：/scatter b4094064（同时回复osr）\n")]
+              "你可以使用/scatter (/散点)回复包含 .osr/.mr 文件的消息的同时使用 bid 指定谱面，来显示打击位置的二维散点图。\n命令格式：/scatter [b<bid>]\n示例：/scatter b4094064（同时回复osr）\n"),
+             
+             ("acc", "单曲ACC计算", "1", "2",
+              "你可以使用/acc (/单曲)命令来计算osu!mania段位的单曲ACC。\n支持两种使用方式：\n1. 直接命令模式: /acc <段位名> <acc变化>\n/acc <bid> [单曲个数] <acc变化>\n2. 交互模式: 直接发送 /acc，然后按照提示进行操作。\n本功能可以根据bid或提供文件自动划分单曲且支持自定义物量以及单曲个数。\n\n注意事项:\n1. 使用 ‘-’ 分隔acc变化。如 99.4-99.3-98.8-97.6\n2. 使用 ‘,’ (半角) 分隔自定义物量。如1145,1419,1981(3首歌的段位)\n\n查看所有内置段位请发送: /omtk acc 2"),
+             
+             ("acc", "单曲ACC计算", "2", "2",
+              "可用段位列表:\n" + format_dan_list(get_available_dans()))
+             ]
 
 @omtk.handle()
 async def handle_omtk(event: MessageEvent):
@@ -50,7 +77,7 @@ async def handle_omtk(event: MessageEvent):
         cmd = event.get_plaintext().strip().split()
         match len(cmd):
             case 1:
-                await omtk.finish(">osu!mania工具箱<\n发送/omtk显示此信息。发送/omtk <命令名> [页码]获取该命令的详细用法。\n\n可用命令：\n1. /rework - 星数重算\n2. /pressingtime 或 /按压 - 按键时间分析\n3. /analyze 或 /分析 - 作弊分析\n4. /delta 或 /偏差 - 判定偏差分析\n5. /lifebar 或 /血条 - 血条显示\n6. /spectrum 或 /频谱 - 频谱显示\n7. /scatter 或 /散点 - 散点图\n") # 基础帮助信息
+                await omtk.finish(">osu!mania工具箱<\n发送/omtk显示此信息。发送/omtk <命令名> [页码]获取该命令的详细用法。\n\n可用命令：\n1. /rework - 星数重算\n2. /pressingtime 或 /按压 - 按键时间分析\n3. /analyze 或 /分析 - 作弊分析\n4. /delta 或 /偏差 - 判定偏差分析\n5. /lifebar 或 /血条 - 血条显示\n6. /spectrum 或 /频谱 - 频谱显示\n7. /scatter 或 /散点 - 散点图\n8. /acc 或 /单曲 - 单曲ACC计算\n") # 基础帮助信息
             case 2 | 3:
                 if len(cmd) == 2:
                     cmd.append("1")  # 默认页码为1

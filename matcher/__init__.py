@@ -6,6 +6,7 @@ from .delta import delta
 from .lifebar import lifebar
 from .spectrum import spectrum
 from .scatter import scatter
+from .acc import acc
 
 __all__ = ["pressingtime",
            "rework",
@@ -14,5 +15,6 @@ __all__ = ["pressingtime",
             "delta",
             "lifebar",
             "spectrum",
-            "scatter"
+            "scatter",
+            "acc"
            ]

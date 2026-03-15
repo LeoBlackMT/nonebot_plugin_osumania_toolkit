@@ -8,8 +8,8 @@ from pathlib import Path
 
 from ..file.file import download_file_by_id, get_file_url
 from ..file.osu_file_parser import osu_file
-from ..algorithm.rework import get_result_text, get_rework_result, parse_osu_filename, process_zip_file
-from ..algorithm.utils import parse_cmd, is_mc_file
+from ..algorithm.rework import get_rework_result_text, get_rework_result, process_zip_file
+from ..algorithm.utils import parse_cmd, is_mc_file, parse_osu_filename
 from ..algorithm.convert import convert_mc_to_osu
 
 from nonebot_plugin_localstore import get_plugin_cache_dir
@@ -103,7 +103,7 @@ async def handle_rework(bot: Bot, event: MessageEvent):
                     osu_obj = osu_file(chart_file)
                     osu_obj.process()
                     meta_data = osu_obj.meta_data
-                await rework.send(get_result_text(meta_data, mod_display, sr, speed_rate, od_flag, LN_ratio, column_count), to_sender=True)
+                await rework.send(get_rework_result_text(meta_data, mod_display, sr, speed_rate, od_flag, LN_ratio, column_count), to_sender=True)
                 
         except Exception as e:
             if str(e) == "ParseError":
@@ -128,7 +128,7 @@ async def handle_rework(bot: Bot, event: MessageEvent):
                 await rework.finish(f"未找到谱面: b{bid}")
                 
             sr, LN_ratio, column_count = await get_rework_result(str(tmp_file), speed_rate, od_flag, cvt_flag)
-            await rework.send(get_result_text(parse_osu_filename(file_name), mod_display, sr, speed_rate, od_flag, LN_ratio, column_count), to_sender=True)
+            await rework.send(get_rework_result_text(parse_osu_filename(file_name), mod_display, sr, speed_rate, od_flag, LN_ratio, column_count), to_sender=True)
         except FinishedException:
             pass
         except Exception as e:

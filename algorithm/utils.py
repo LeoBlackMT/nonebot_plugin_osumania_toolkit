@@ -1,7 +1,6 @@
 import bisect
 import json
 import os
-import sys
 
 from nonebot.log import logger
 
@@ -112,24 +111,18 @@ def parse_cmd(cmd_text: str):
         # 特殊处理：当部分以 "b" 开头且包含 "+" 但无法解析为整数时，尝试拆分
         if part.lower().startswith("b") and "+" in part:
             try:
-                # 尝试直接解析为整数（如果后面没有 + 的情况）
+                # 如果后面没有 + 的情况
                 int(part[1:])
-                # 如果成功，说明没有 + 干扰，正常处理
                 bid = int(part[1:])
                 i += 1
                 continue
             except ValueError:
-                # 解析失败，说明确实有 "+" 干扰，进行拆分
+                # 进行拆分
                 plus_index = part.find('+')
-                bid_part = part[:plus_index]      # 如 "b123456"
-                mod_part = part[plus_index:]      # 如 "+DTHR"
-
-                # 替换当前部分为 bid 部分
+                bid_part = part[:plus_index]
+                mod_part = part[plus_index:] 
                 cmd_parts[i] = bid_part
-                # 在当前位置后插入 mod 部分
                 cmd_parts.insert(i + 1, mod_part)
-                # 此时列表长度增加，但我们继续处理当前 i（即 bid 部分）
-                # 不增加 i，下一次循环仍然处理这个位置（现在是 bid_part）
                 continue
 
         # 模组处理
@@ -236,6 +229,7 @@ def parse_cmd(cmd_text: str):
                 err_msg.append(f"无效的面缝参数: {part[4:]}; ")
             i += 1
             continue
+        
         i += 1
 
     return speed_rate, od_flag, cvt_flag, bid, mod_display, err_msg
@@ -333,3 +327,49 @@ def malody_mods_to_osu_mods(malody_flags: int) -> tuple:
         osu_mods.append("NoMod")
         
     return osu_mod, osu_mods
+
+def parse_osu_filename(file_path: str) -> dict | None:
+    """
+    <artist> - <title> (<mapper>) [<difficulty>].osu
+    """
+    import os
+    
+    # 提取文件名（去除路径）
+    filename = os.path.basename(file_path)
+
+    # 检查扩展名并去除
+    if not filename.lower().endswith('.osu'):
+        return None
+    name_without_ext = filename[:-4]  # 去掉最后的 .osu
+
+    # 提取难度名：位于最后一个 [ ... ] 中
+    last_left_bracket = name_without_ext.rfind('[')
+    last_right_bracket = name_without_ext.rfind(']')
+    if last_left_bracket == -1 or last_right_bracket == -1 or last_left_bracket > last_right_bracket:
+        return None  # 缺少有效的难度名括号
+    difficulty = name_without_ext[last_left_bracket + 1:last_right_bracket]
+    # 剩余部分（去掉难度名及其方括号，并去除可能多余的空格）
+    remaining_after_diff = name_without_ext[:last_left_bracket].rstrip()
+
+    # 提取谱师：位于最后一个 ( ... ) 中
+    last_left_paren = remaining_after_diff.rfind('(')
+    last_right_paren = remaining_after_diff.rfind(')')
+    if last_left_paren == -1 or last_right_paren == -1 or last_left_paren > last_right_paren:
+        return None  # 缺少有效的谱师括号
+    mapper = remaining_after_diff[last_left_paren + 1:last_right_paren]
+    # 剩余部分（去掉谱师及其括号）
+    remaining_after_mapper = remaining_after_diff[:last_left_paren].rstrip()
+
+    # 提取曲师和曲名：以 " - " 分隔，只分割一次
+    if ' - ' not in remaining_after_mapper:
+        return None
+    artist, title = remaining_after_mapper.split(' - ', 1)
+    artist = artist.strip()
+    title = title.strip()
+    
+    return {
+        'Artist': artist,
+        'Title': title,
+        'Creator': mapper,
+        'Version': difficulty
+    }

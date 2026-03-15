@@ -9,10 +9,9 @@ from ..file.osu_file_parser import osu_file
 
 from .xxy_algorithm import calculate
 from ..algorithm.convert import convert_mc_to_osu
-from ..algorithm.utils import is_mc_file
+from ..algorithm.utils import is_mc_file, parse_osu_filename
 
-
-def get_result_text(meta_data, mod_display: str, sr: float, speed_rate: float, od_flag, LN_ratio: float, column_count: int):
+def get_rework_result_text(meta_data, mod_display: str, sr: float, speed_rate: float, od_flag, LN_ratio: float, column_count: int):
     
     result = []
     extra_parts = []
@@ -43,50 +42,6 @@ def get_result_text(meta_data, mod_display: str, sr: float, speed_rate: float, o
     result.append(f"Rework结果 => {sr:.2f}")
 
     return "谱面信息：\n" + "\n".join(result)
-
-def parse_osu_filename(file_path: str) -> dict | None:
-    """
-    <artist> - <title> (<mapper>) [<difficulty>].osu
-    """
-    # 提取文件名（去除路径）
-    filename = os.path.basename(file_path)
-
-    # 检查扩展名并去除
-    if not filename.lower().endswith('.osu'):
-        return None
-    name_without_ext = filename[:-4]  # 去掉最后的 .osu
-
-    # 提取难度名：位于最后一个 [ ... ] 中
-    last_left_bracket = name_without_ext.rfind('[')
-    last_right_bracket = name_without_ext.rfind(']')
-    if last_left_bracket == -1 or last_right_bracket == -1 or last_left_bracket > last_right_bracket:
-        return None  # 缺少有效的难度名括号
-    difficulty = name_without_ext[last_left_bracket + 1:last_right_bracket]
-    # 剩余部分（去掉难度名及其方括号，并去除可能多余的空格）
-    remaining_after_diff = name_without_ext[:last_left_bracket].rstrip()
-
-    # 提取谱师：位于最后一个 ( ... ) 中
-    last_left_paren = remaining_after_diff.rfind('(')
-    last_right_paren = remaining_after_diff.rfind(')')
-    if last_left_paren == -1 or last_right_paren == -1 or last_left_paren > last_right_paren:
-        return None  # 缺少有效的谱师括号
-    mapper = remaining_after_diff[last_left_paren + 1:last_right_paren]
-    # 剩余部分（去掉谱师及其括号）
-    remaining_after_mapper = remaining_after_diff[:last_left_paren].rstrip()
-
-    # 提取曲师和曲名：以 " - " 分隔，只分割一次
-    if ' - ' not in remaining_after_mapper:
-        return None
-    artist, title = remaining_after_mapper.split(' - ', 1)
-    artist = artist.strip()
-    title = title.strip()
-    
-    return {
-        'Artist': artist,
-        'Title': title,
-        'Creator': mapper,
-        'Version': difficulty
-    }
 
 async def get_rework_result(file_path: str, speed_rate: float, od_flag, cvt_flag):
     try:
@@ -149,7 +104,7 @@ async def process_chart_file(chart_file: Path, speed_rate: float, od_flag, cvt_f
             osu_obj.process()
             meta_data = osu_obj.meta_data
         
-        return get_result_text(meta_data, mod_display, sr, speed_rate, od_flag, LN_ratio, column_count)
+        return get_rework_result_text(meta_data, mod_display, sr, speed_rate, od_flag, LN_ratio, column_count)
         
     except Exception as e:
         if str(e) == "ParseError":
