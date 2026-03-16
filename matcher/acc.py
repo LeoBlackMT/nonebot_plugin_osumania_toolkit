@@ -311,6 +311,7 @@ async def acc_handle_second(matcher: Matcher, bot: Bot, state: T_State, message:
             state["mode"] = "custom"
             state["note_counts"] = note_counts
             state["display_name"] = "自定义物量"
+            state["sv2_flag"] = False # 自定义物量sv2无意义
             
             # 根据物量个数生成ACC格式提示
             acc_format = "-".join([f"acc{i+1}" for i in range(len(note_counts))])
@@ -418,7 +419,7 @@ async def acc_handle_third(state: T_State, message: Message = Arg("handle_third"
                 state["status"] = "Fail"
                 await acc.finish("错误: 未获取到段位名")
                 
-            single_accs, calc_error = calculate_acc_from_dan(dan_name, state["acc_str"])
+            single_accs, calc_error = calculate_acc_from_dan(dan_name, state["acc_str"], state.get("sv2_flag", False))
             if calc_error:
                 state["status"] = "Fail"
                 await acc.finish(f"计算错误: {calc_error}")
@@ -457,7 +458,7 @@ async def acc_handle_third(state: T_State, message: Message = Arg("handle_third"
                 state["status"] = "Fail"
                 await acc.finish("错误: 未获取到物量数据")
             
-            single_accs, calc_error = calculate_acc(note_counts, state["acc_str"])
+            single_accs, calc_error = calculate_acc(note_counts, state["acc_str"], state.get("sv2_flag", False))
             if calc_error:
                 state["status"] = "Fail"
                 await acc.finish(f"计算错误: {calc_error}")
@@ -469,7 +470,7 @@ async def acc_handle_third(state: T_State, message: Message = Arg("handle_third"
                 note_counts,
                 state["acc_str"],
                 single_accs,
-                False # sv2_flag在谱面模式下不影响计算结果，传False
+                state.get("sv2_flag", False)
             )
             
         except FinishedException:
