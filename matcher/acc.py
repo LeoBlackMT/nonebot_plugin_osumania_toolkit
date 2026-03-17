@@ -41,7 +41,8 @@ async def acc_handle_first(matcher: Matcher, event: MessageEvent, state: T_State
     
     if error_msg:
         state["status"] = "Fail"
-        await acc.finish(f"错误: {'\n'.join(error_msg)}")
+        error_text = '\n'.join(error_msg)
+        await acc.finish(f"错误: {error_text}")
         
     # 初始化所有state
     state["acc_str"] = acc_str
