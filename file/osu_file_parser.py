@@ -23,6 +23,8 @@ class osu_file:
         self.LN_ratio = 0.0
         self.note_times = {}
         self.meta_data = {}
+        self.breaks = []
+        self.object_intervals = []
 
     def get_parsed_data(self):
         return [self.column_count,
@@ -34,7 +36,9 @@ class osu_file:
                 self.GameMode,
                 self.status,
                 self.LN_ratio,
-                self.meta_data
+                self.meta_data,
+                self.breaks,
+                self.object_intervals
                 ]
     
     def process(self):
@@ -43,6 +47,7 @@ class osu_file:
 
         i = 0
         in_metadata_section = False
+        in_events_section = False
         while i < len(lines):
             line = lines[i].strip()
             if not line:
@@ -54,13 +59,21 @@ class osu_file:
                 in_metadata_section = True
                 i += 1
                 continue
+            if line == "[Events]":
+                in_events_section = True
+                i += 1
+                continue
             elif line.startswith("[") and line.endswith("]"):
                 in_metadata_section = False
+                in_events_section = False
 
             if in_metadata_section:
                 if ":" in line:
                     key, value = line.split(":", 1)
                     self.meta_data[key.strip()] = value.strip()
+
+            if in_events_section:
+                self.parse_event_line(line)
 
             if "OverallDifficulty:" in line:
                 try:
@@ -98,12 +111,33 @@ class osu_file:
             i += 1
         self.LN_ratio = self.get_LN_ratio()
         self.note_times = self.get_note_times()
+        self.object_intervals = self.get_object_intervals()
         self.status = "OK"
         logger.debug(f"谱面物件总数: {len(self.note_starts)}")
         logger.debug(f"谱面最后物件时间: {max(self.note_starts) if self.note_starts else 0} ms")
         logger.debug(f"谱面物件时间样本（前10个）：{str(self.note_starts[:10])}")
         logger.debug(f"谱面物件时间样本（后10个）：{str(self.note_starts[-10:])}")
         # logger.debug("各列物件数量：", {col: len(times) for col, times in self.note_times.items()})
+
+    def parse_event_line(self, event_line):
+        if not event_line or event_line.startswith("//"):
+            return
+
+        params = [part.strip() for part in event_line.split(",")]
+        if len(params) < 3:
+            return
+
+        if params[0] not in {"2", "Break"}:
+            return
+
+        try:
+            break_start = int(float(params[1]))
+            break_end = int(float(params[2]))
+        except (TypeError, ValueError):
+            return
+
+        if break_end > break_start:
+            self.breaks.append([break_start, break_end])
 
     def parse_hit_object(self, object_line):
         params = object_line.split(",")
@@ -146,6 +180,21 @@ class osu_file:
         for col in note_times:
             note_times[col].sort()
         return note_times
+
+    def get_object_intervals(self):
+        if not self.note_starts:
+            return []
+
+        sorted_starts = sorted(int(start) for start in self.note_starts)
+        intervals = []
+        prev_start = None
+        for start_time in sorted_starts:
+            interval = 0 if prev_start is None else start_time - prev_start
+            intervals.append([start_time, interval])
+            prev_start = start_time
+
+        intervals.sort(key=lambda item: (-item[1], item[0]))
+        return intervals
     
     def mod_IN(self, gap: float = 150, ln_as_hit_thres: float = 100):
         # 反键处理 (Full LN)
