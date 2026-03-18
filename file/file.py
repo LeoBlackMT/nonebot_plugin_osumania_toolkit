@@ -10,8 +10,15 @@ from pathlib import Path
 from urllib.parse import unquote
 from typing import Optional, Tuple
 
+_WINDOWS_RESERVED = re.compile(
+    r'^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\.|$)', re.IGNORECASE
+)
+
 def safe_filename(filename: str) -> str:
-    return re.sub(r'[\\/*?:"<>|]', '_', filename)
+    name = re.sub(r'[\\/*?:"<>|]', '_', filename)
+    if _WINDOWS_RESERVED.match(name):
+        name = '_' + name
+    return name
 
 
 async def get_file_url(bot: Bot, file_seg: MessageSegment) -> Optional[Tuple[str, str]]:
@@ -111,8 +118,8 @@ async def download_file(url: str, save_path: Path) -> bool:
                 logger.error(f"本地文件不存在：{local_file_path}")
                 return False
 
-            logger.info(f"从本地路径移动文件：{local_file_path} -> {save_path}")
-            shutil.move(local_file_path, save_path)  # 移动文件，自动清理源文件
+            logger.info(f"从本地路径复制文件：{local_file_path} -> {save_path}")
+            shutil.copy2(local_file_path, save_path)
             return True
         else:
             # HTTP/HTTPS 下载
