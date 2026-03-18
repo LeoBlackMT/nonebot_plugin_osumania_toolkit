@@ -7,6 +7,7 @@ from .lifebar import lifebar
 from .spectrum import spectrum
 from .scatter import scatter
 from .acc import acc
+from .percy import percy
 
 __all__ = ["pressingtime",
            "rework",
@@ -16,5 +17,6 @@ __all__ = ["pressingtime",
             "lifebar",
             "spectrum",
             "scatter",
-            "acc"
+            "acc",
+            "percy"
            ]

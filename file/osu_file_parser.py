@@ -112,7 +112,8 @@ class osu_file:
         self.LN_ratio = self.get_LN_ratio()
         self.note_times = self.get_note_times()
         self.object_intervals = self.get_object_intervals()
-        self.status = "OK"
+        if self.status not in {"Fail", "NotMania"}:
+            self.status = "OK"
         logger.debug(f"谱面物件总数: {len(self.note_starts)}")
         logger.debug(f"谱面最后物件时间: {max(self.note_starts) if self.note_starts else 0} ms")
         logger.debug(f"谱面物件时间样本（前10个）：{str(self.note_starts[:10])}")
@@ -141,7 +142,7 @@ class osu_file:
 
     def parse_hit_object(self, object_line):
         params = object_line.split(",")
-        if len(params) < 6:
+        if len(params) < 5:
             return
 
         try:
@@ -156,8 +157,13 @@ class osu_file:
             note_type = int(params[3])
             self.note_types.append(note_type)
 
-            last_param_chunk = params[5].split(":")
-            note_end = int(last_param_chunk[0])
+            # mania 普通 note 通常只有 5 段；LN 会在第 6 段携带结束时间。
+            # note_type 的 bit 7 表示 hold (LN)。
+            if (note_type & 128) != 0 and len(params) >= 6:
+                last_param_chunk = params[5].split(":")
+                note_end = int(last_param_chunk[0])
+            else:
+                note_end = note_start
             self.note_ends.append(note_end)
         except Exception as e:
             self.status = "Fail"
@@ -167,7 +173,7 @@ class osu_file:
         total_notes = len(self.note_types)
         if total_notes == 0:
             return 0.0
-        ln_count = sum(1 for t in self.note_types if t == 128)
+        ln_count = sum(1 for t in self.note_types if (t & 128) != 0)
         return ln_count / total_notes
     
     def get_column_count(self):
@@ -216,7 +222,7 @@ class osu_file:
             self.columns, self.note_starts, self.note_ends, self.note_types
         ):
             # 长按键的长度为 end-start，普通按键记为 NaN
-            length = float(np.nan) if ntype != 128 else end - start
+            length = float(np.nan) if (ntype & 128) == 0 else end - start
             notes_by_col.setdefault(col, []).append((start, length))
 
         new_cols = []
@@ -276,6 +282,6 @@ class osu_file:
         # 转米处理 (No LN)
         # 将所有长按键转换为普通按键，即将 note_types 中值为 128 的项改为 1，并将 note_ends 中对应项的值改为 0.
         for i in range(len(self.note_types)):
-            if self.note_types[i] == 128:
+            if (self.note_types[i] & 128) != 0:
                 self.note_types[i] = 1
                 self.note_ends[i] = 0

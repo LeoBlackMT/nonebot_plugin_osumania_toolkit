@@ -124,8 +124,8 @@ def preprocess_file(file_path, speed_rate, od_flag, cvt_flag):
     for i in range(len(p[1])):
         k = p[1][i]
         h = p[2][i]
-        # Only set tail_time when p[4]==128; otherwise use -1.
-        t = p[3][i] if p[4][i] == 128 else -1
+        # note_type bit 7 表示 LN；其余情况下视作普通 note。
+        t = p[3][i] if (p[4][i] & 128) != 0 else -1
         '''
         if mod == "DT":
             h = int(math.floor(h * 2/3))

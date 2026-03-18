@@ -558,8 +558,4 @@ async def acc_handle_third(state: T_State, message: Message = Arg("handle_third"
         - 否则获取用户输入的ACC字符串，进行计算，生成结果消息并发送，标记Finish
         - 用户输入错误: 提示错误并重试，超过次数则标记Fail
         - 程序发生异常: 标记Fail
-        
-计划
-    - 增强谱面物量计算，或修复潜在的问题
-    - 增加更多内置段位
 """

@@ -87,6 +87,20 @@ def format_dan_list_grouped(dans: list, items_per_line: int = 5) -> str:
 # 帮助文本数据
 class omtk_help_data:
     # help_text 结构: (命令, 命令名称, 页码, 总页码, 帮助文本)
+    main_menu_text = (
+        ">osu!mania工具箱<\n"
+        "发送/omtk显示此信息。发送/omtk <命令名> [页码]获取该命令的详细用法。\n\n"
+        "可用命令：\n"
+        "1. /rework - 星数重算\n"
+        "2. /pressingtime 或 /按压 - 按键时间分析\n"
+        "3. /analyze 或 /分析 - 作弊分析\n"
+        "4. /delta 或 /偏差 - 判定偏差分析\n"
+        "5. /lifebar 或 /血条 - 血条显示\n"
+        "6. /spectrum 或 /频谱 - 频谱显示\n"
+        "7. /scatter 或 /散点 - 散点图\n"
+        "8. /percy 或 /投皮 - 投皮修改\n"
+        "9. /acc 或 /单曲 - 单曲ACC计算\n"
+    )
     help_text = [("rework", "星数重算", "1", "2",
             "你可以回复包含 .osu/.mc 文件的消息，或回复包含 .osz/.mcz 的消息，或使用 bid 指定谱面。\n命令格式：/rework b<bid> +[mods] x[speed] OD[OD] gap:[gap] \n示例：/rework b4094064 +EZHO x1.25\n/rework b4094064 +IN OD8 gap:50\n警告：图包分析开销较大，请勿滥用。结果将发送大量文字，谨防刷屏。\n注意：1. 如果你回复了一个包含谱面/图包文件的消息，命令将忽略bid。\n2. 部分模组和参数冲突。"),
             
@@ -113,6 +127,9 @@ class omtk_help_data:
             
             ("scatter", "散点图", "1", "1",
             "你可以使用/scatter (/散点)回复包含 .osr/.mr 文件的消息的同时使用 bid 指定谱面，来显示打击位置的二维散点图。\n命令格式：/scatter [b<bid>]\n示例：/scatter b4094064（同时回复osr）\n"),
+
+            ("percy", "投皮", "1", "1",
+            "你可以使用/percy (/投皮)命令来查看或修改 LN 图片的投机取巧程度。\n用法：回复一条包含 .png *文件*的消息，同时发送 /percy [d] [lazer|lzr]。\n参数说明：\n1. d：目标投机取巧程度（整数）。不填写时仅识别并返回当前程度。\n2. lazer/lzr：按 Lazer 规则处理与显示（可选）。\n示例：/percy（仅识别当前程度）\n/percy 150（将投皮程度调整到 150px）\n/percy 225 lzr（按 Lazer 模式调整）\n注意:\n1. Lazer 模式会进行 -75px 修正（下限 0），同时将图片长度固定在32800px。\n2. 本程序暂不支持渐变颜色面身、非单一颜色或含有图案面身的皮肤。\n3. 请确保回复的文件为 .png 格式。"),
             
             ("acc", "单曲ACC计算", "1", "3",
             "你可以使用/acc (/单曲)命令来计算osu!mania段位的单曲ACC，或通过单曲ACC推算段内变化。\n支持两种使用方式：\n1. 直接命令模式: /acc [-r] <段位名> <acc>\n/acc [-r] b<bid> [单曲个数] <acc> [-sv2]\n2. 交互模式: 直接发送 /acc [-r]，然后按照提示进行操作。\n本功能可以根据bid或提供文件自动划分单曲且支持自定义物量以及单曲个数。\n\n注意事项:\n1. 使用 ‘-’ 分隔acc。如 99.4-99.3-98.8-97.6\n2. 使用 ‘,’ (半角) 分隔自定义物量。如1145,1419,1981(3首歌的段位)\n3. 支持上传 .osu/.mc 谱面文件。\n4. 命令中包含 -sv2 （即sv2标识）时启用sv2模组\n5. 命令中包含 -r （即反向计算标识）时通过单曲ACC推算段内变化\n\n查看可用段位列表请发送: /omtk acc 2"),
@@ -130,6 +147,7 @@ class omtk_help_data:
         "血条": "lifebar",
         "频谱": "spectrum",
         "散点": "scatter",
+        "投皮": "percy",
         "单曲": "acc"
         }
 

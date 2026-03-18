@@ -7,6 +7,33 @@ from nonebot.log import logger
 from ..file.osr_file_parser import osr_file
 from ..file.osu_file_parser import osu_file
 
+from nonebot.adapters.onebot.v11 import (
+    Bot,
+    GroupMessageEvent,
+    Message,
+    MessageEvent,
+    MessageSegment,
+    PrivateMessageEvent,
+)
+
+async def send_forward_text_messages(bot: Bot, event: MessageEvent, texts: list[str], nickname: str = "Bot"):
+    """发送合并转发消息，适用于文本较多的情况"""
+    nodes = [
+        MessageSegment.node_custom(
+            user_id=int(bot.self_id),
+            nickname=nickname,
+            content=Message(text),
+        )
+        for text in texts
+    ]
+
+    if isinstance(event, GroupMessageEvent):
+        await bot.call_api("send_group_forward_msg", group_id=event.group_id, messages=nodes)
+    elif isinstance(event, PrivateMessageEvent):
+        await bot.call_api("send_private_forward_msg", user_id=event.user_id, messages=nodes)
+    else:
+        for text in texts:
+            await bot.send(text)
 
 def match_notes_and_presses(osu: osu_file, osr: osr_file):
     """

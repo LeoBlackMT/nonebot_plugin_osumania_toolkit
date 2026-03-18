@@ -8,6 +8,7 @@ from pathlib import Path
 
 from ..file.file import download_file, download_file_by_id, get_file_url
 from ..file.osu_file_parser import osu_file
+from ..algorithm.utils import send_forward_text_messages
 from ..algorithm.rework import get_rework_result_text, get_rework_result, process_zip_file
 from ..algorithm.utils import parse_cmd, is_mc_file, parse_osu_filename
 from ..algorithm.convert import convert_mc_to_osu
@@ -68,10 +69,17 @@ async def handle_rework(bot: Bot, event: MessageEvent):
                 # 发送结果（分批发送，避免消息过长）
                 batch_size = 5  # 每批发送5个结果
                 total_batches = (len(results) + batch_size - 1) // batch_size  # 计算总批次数
+                batch_messages: list[str] = []
                 for i in range(0, len(results), batch_size):
                     batch = results[i:i + batch_size]
                     batch_text = "\n\n".join(batch)
-                    await rework.send(f"结果（{i//batch_size + 1}/{total_batches}）:\n{batch_text}")
+                    batch_messages.append(f"结果（{i//batch_size + 1}/{total_batches}）:\n{batch_text}")
+
+                if len(results) <= 3:
+                    for message in batch_messages:
+                        await rework.send(message)
+                else:
+                    await send_forward_text_messages(bot, event, batch_messages)
                     
             else:
                 # 处理单个谱面文件
