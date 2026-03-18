@@ -187,7 +187,7 @@ async def download_file(url: str, save_path: Path) -> bool:
 
             logger.info(f"从本地路径复制文件：{local_file_path} -> {save_path}")
             shutil.copy2(local_file_path, save_path)
-            # 出于安全考虑，这里不再删除源文件，避免潜在的任意文件删除风险
+            asyncio.create_task(cleanup_temp_file(local_file_path, delay=30.0))
             return True
         else:
             # HTTP/HTTPS 下载
