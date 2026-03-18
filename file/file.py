@@ -7,11 +7,66 @@ import time
 from nonebot.log import logger
 from nonebot.adapters.onebot.v11 import Bot, MessageSegment
 from pathlib import Path
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
 from typing import Optional, Tuple
 
+_WINDOWS_RESERVED = re.compile(
+    r'^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\.|$)', re.IGNORECASE
+)
+
 def safe_filename(filename: str) -> str:
-    return re.sub(r'[\\/*?:"<>|]', '_', filename)
+    name = re.sub(r'[\\/*?:"<>|]', '_', filename)
+    if _WINDOWS_RESERVED.match(name):
+        name = '_' + name
+    return name
+
+
+def _get_local_path_from_str(path_str: str) -> Optional[Path]:
+    """
+    将字符串解析为本地绝对路径。
+    支持：
+    - 绝对路径（Windows/Unix/UNC）
+    - file:// URI
+    若无法解析为本地绝对路径则返回 None。
+    """
+    if not path_str:
+        return None
+
+    try:
+        if path_str.startswith("file://"):
+            parsed = urlparse(path_str)
+            if parsed.scheme != "file":
+                return None
+            # 对于 file:// URI，从 path 中取实际文件路径并反解码
+            file_path = unquote(parsed.path or "")
+            if not file_path:
+                return None
+            p = Path(file_path)
+        else:
+            p = Path(path_str)
+
+        # 仅接受本地绝对路径，避免误删工作目录等相对路径文件
+        if not p.is_absolute():
+            return None
+    except Exception:
+        return None
+
+    return p
+
+
+def _to_local_path(path_or_uri: str) -> Path:
+    """
+    将可能为 file:// URI 的字符串转换为本地 Path。
+    非 file:// 字符串按原样交给 Path 处理。
+    """
+    if path_or_uri.startswith("file://"):
+        parsed = urlparse(path_or_uri)
+        path = unquote(parsed.path)
+        # 处理类似 file:///C:/path 这种在 Windows 上会多出一个前导斜杠的情况
+        if re.match(r"^/[A-Za-z]:", path):
+            path = path[1:]
+        return Path(path)
+    return Path(path_or_uri)
 
 
 async def get_file_url(bot: Bot, file_seg: MessageSegment) -> Optional[Tuple[str, str]]:
@@ -38,6 +93,14 @@ async def get_file_url(bot: Bot, file_seg: MessageSegment) -> Optional[Tuple[str
         # 获取文件 URL
         file_url = file_data.get("url", "")
 
+        # 如果 url 字段是 HTTP URL，检查 file 字段是否同时存有本地路径，有则调度清理
+        if file_url and file_url.startswith("http"):
+            file_field_raw = file_data.get("file", "")
+            if file_field_raw and not file_field_raw.startswith("http"):
+                local_path = _get_local_path_from_str(file_field_raw)
+                if local_path is not None:
+                    asyncio.create_task(cleanup_temp_file(local_path))
+
         # 如果没有直接的 URL，尝试其他方法
         if not file_url:
             # 方法1: 检查 file 字段是否已经是 URL
@@ -51,7 +114,15 @@ async def get_file_url(bot: Bot, file_seg: MessageSegment) -> Optional[Tuple[str
                 try:
                     # 尝试调用 get_file API（仅部分实现支持）
                     file_info = await bot.call_api("get_file", file_id=file_field)
-                    file_url = file_info.get("url", "") or file_info.get("file", "")
+                    http_url = file_info.get("url", "")
+                    local_file_str = file_info.get("file", "")
+                    if http_url:
+                        file_url = http_url
+                        local_path = _get_local_path_from_str(local_file_str)
+                        if local_path is not None:
+                            asyncio.create_task(cleanup_temp_file(local_path))
+                    elif local_file_str:
+                        file_url = local_file_str
                     if file_url:
                         logger.info(f"通过 get_file API 获取到 URL: {file_url}")
                 except Exception as e:
@@ -101,8 +172,11 @@ async def download_file(url: str, save_path: Path) -> bool:
         # 检查是否是 file:// URI
         elif url.startswith('file://'):
             is_local_path = True
-            # 移除 file:// 前缀并转换为路径
-            path_str = url[7:]  # 移除 'file://'
+            # 移除 file:// 前缀，解码 URL 编码，并转换为路径
+            path_str = unquote(url[7:])  # 移除 'file://' 并解码 %xx
+            # Windows: file:///C:/... -> /C:/... -> C:/...
+            if len(path_str) > 2 and path_str[0] == '/' and path_str[2] == ':':
+                path_str = path_str[1:]
             local_file_path = Path(path_str)
 
         if is_local_path and local_file_path:
@@ -111,8 +185,9 @@ async def download_file(url: str, save_path: Path) -> bool:
                 logger.error(f"本地文件不存在：{local_file_path}")
                 return False
 
-            logger.info(f"从本地路径移动文件：{local_file_path} -> {save_path}")
-            shutil.move(local_file_path, save_path)  # 移动文件，自动清理源文件
+            logger.info(f"从本地路径复制文件：{local_file_path} -> {save_path}")
+            shutil.copy2(local_file_path, save_path)
+            asyncio.create_task(cleanup_temp_file(local_file_path, delay=30.0))
             return True
         else:
             # HTTP/HTTPS 下载

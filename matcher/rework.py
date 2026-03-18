@@ -1,12 +1,12 @@
 import os
+import logging
 
-import aiohttp
 from nonebot import on_command
 from nonebot.adapters.onebot.v11 import Bot, MessageEvent
 from nonebot.exception import FinishedException
 from pathlib import Path
 
-from ..file.file import download_file_by_id, get_file_url
+from ..file.file import download_file, download_file_by_id, get_file_url
 from ..file.osu_file_parser import osu_file
 from ..algorithm.rework import get_rework_result_text, get_rework_result, process_zip_file
 from ..algorithm.utils import parse_cmd, is_mc_file, parse_osu_filename
@@ -54,17 +54,9 @@ async def handle_rework(bot: Bot, event: MessageEvent):
 
         tmp_file = CACHE_DIR / file_name
 
-        try:
-            # 下载文件
-            async with aiohttp.ClientSession() as session:
-                async with session.get(file_url) as resp:
-                    if resp.status == 200:
-                        with open(tmp_file, 'wb') as f:
-                            f.write(await resp.read())
-                    else:
-                        await rework.finish(f"文件下载失败，状态码：{resp.status}")
-        except Exception as e:
-            await rework.finish(f"下载异常：{e}")
+        if not await download_file(file_url, tmp_file):
+            logging.warning("Failed to download file '%s' from URL '%s'", file_name, file_url)
+            await rework.finish(f"下载失败：无法获取文件 {file_name}，请检查文件是否存在且机器人有权限访问。")
 
         # 检查文件类型并处理
         try:
