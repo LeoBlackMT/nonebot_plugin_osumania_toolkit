@@ -57,7 +57,9 @@ def match_notes_and_presses(osu: osu_file, osr: osr_file):
     # 获取按下事件（使用已缩放的时间，用于匹配谱面）
     # 对于普通.osr文件：press_events是实时时间（已应用速度模组）
     # 对于.mr转换的osr文件：press_events是逆缩放时间（用于匹配原始谱面时间）
-    press_events = osr.press_events
+    press_events = getattr(osr, "press_events_float", None)
+    if not press_events:
+        press_events = osr.press_events
 
     # 检查是否启用 Mirror 模组 (MR)
     mod_value = getattr(osr, 'mod', 0)

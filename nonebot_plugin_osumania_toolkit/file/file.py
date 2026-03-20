@@ -5,10 +5,16 @@ import shutil
 import time
 
 from nonebot.log import logger
+from nonebot import get_plugin_config
 from nonebot.adapters.onebot.v11 import Bot, MessageSegment
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 from typing import Optional, Tuple
+from ..config import Config
+config = get_plugin_config(Config)
+
+# 文件大小限制
+MAX_FILE_SIZE = config.max_file_size_mb * 1024 * 1024  # 根据配置设置
 
 _WINDOWS_RESERVED = re.compile(
     r'^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\.|$)', re.IGNORECASE
@@ -139,6 +145,7 @@ async def get_file_url(bot: Bot, file_seg: MessageSegment) -> Optional[Tuple[str
         logger.error(f"获取文件信息时发生异常: {e}")
         return None
 
+
 async def download_file(url: str, save_path: Path) -> bool:
     """
     下载文件或复制本地文件到指定路径
@@ -184,6 +191,12 @@ async def download_file(url: str, save_path: Path) -> bool:
             if not local_file_path.exists():
                 logger.error(f"本地文件不存在：{local_file_path}")
                 return False
+            
+            # 检查文件大小
+            file_size = local_file_path.stat().st_size
+            if file_size > MAX_FILE_SIZE:
+                logger.warning(f"文件过大（{file_size / 1024 / 1024:.2f}MB）超过限制（{config.max_file_size_mb}MB）：{local_file_path}")
+                return False
 
             logger.info(f"从本地路径复制文件：{local_file_path} -> {save_path}")
             shutil.copy2(local_file_path, save_path)
@@ -194,8 +207,28 @@ async def download_file(url: str, save_path: Path) -> bool:
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as resp:
                     if resp.status == 200:
+                        # 检查 Content-Length 头，提前拦截超大文件
+                        content_length = resp.headers.get('Content-Length')
+                        if content_length:
+                            try:
+                                size = int(content_length)
+                                if size > MAX_FILE_SIZE:
+                                    logger.warning(f"文件过大（{size / 1024 / 1024:.2f}MB）超过限制（{config.max_file_size_mb}MB）：{url}")
+                                    return False
+                            except ValueError:
+                                pass
+                        
+                        # 流式下载并检查实际大小
+                        downloaded_size = 0
                         with open(save_path, 'wb') as f:
-                            f.write(await resp.read())
+                            async for chunk in resp.content.iter_chunked(1024 * 1024):  # 1MB chunks
+                                downloaded_size += len(chunk)
+                                if downloaded_size > MAX_FILE_SIZE:
+                                    logger.warning(f"下载中发现文件超过限制（{config.max_file_size_mb}MB），中止下载：{url}")
+                                    f.close()
+                                    save_path.unlink()  # 删除不完整的文件
+                                    return False
+                                f.write(chunk)
                         return True
                     else:
                         logger.error(f"下载失败，状态码：{resp.status}")
@@ -213,6 +246,16 @@ async def download_file_by_id(cache_dir: Path, map_id: int) -> tuple[Path, str]:
                 if resp.status != 200:
                     raise Exception(f"下载失败，HTTP {resp.status}")
                 
+                # 检查文件大小限制
+                content_length = resp.headers.get('Content-Length')
+                if content_length:
+                    try:
+                        size = int(content_length)
+                        if size > MAX_FILE_SIZE:
+                            raise Exception(f"谱面文件过大（{size / 1024 / 1024:.2f}MB），超过 {config.max_file_size_mb}MB 限制")
+                    except ValueError:
+                        pass
+                
                 content_disp = resp.headers.get('Content-Disposition', '')
                 filename = None
                 if content_disp:
@@ -225,7 +268,10 @@ async def download_file_by_id(cache_dir: Path, map_id: int) -> tuple[Path, str]:
                     filename = f"b{map_id}"
                 
                 content = await resp.read()
-                
+                # 再检查一次实际大小
+                if len(content) > MAX_FILE_SIZE:
+                    raise Exception(f"谱面文件过大（{len(content) / 1024 / 1024:.2f}MB），超过 {config.max_file_size_mb}MB 限制")
+
     except Exception as e:
         raise Exception(f"下载谱面时出错: {e}")
 

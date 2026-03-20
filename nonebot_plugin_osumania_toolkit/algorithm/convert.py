@@ -216,16 +216,19 @@ def convert_mc_to_osu(mc_file_path: str, output_dir: Optional[str] = None) -> st
             delta_end = end_beat - beat(line[idx_end]['beat'])
             end_time = ms(delta_end, bpm[idx_end], bpmoffset[idx_end])
             type_str = '128'
-            extra = f',0,{int(end_time)}:0:0:0:'
         else:
             type_str = '1'
-            extra = ',0,0:0:0:'
 
         vol = n.get('vol', 100)
         sound = n.get('sound', 0)
-        extra += f'{vol}:{sound}'
 
-        line_str = f'{x},192,{int(n_time)},{type_str},0,0,{extra}'
+        # osu!mania HitObject:
+        # 普通键: x,y,time,type,hitSound,hitSample
+        # 长按键: x,y,time,type,hitSound,endTime:hitSample
+        if 'endbeat' in n:
+            line_str = f'{x},192,{int(n_time)},{type_str},{sound},{int(end_time)}:0:0:0:{vol}:'
+        else:
+            line_str = f'{x},192,{int(n_time)},{type_str},{sound},0:0:0:{vol}:'
         lines.append(line_str)
 
     # 写入文件

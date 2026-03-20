@@ -1,6 +1,7 @@
 import numpy as np
 import asyncio
 import traceback
+import bisect
 
 from scipy.fft import fft, fftfreq
 from scipy.signal import find_peaks
@@ -145,7 +146,7 @@ def analyze_time_domain(data: dict) -> dict:
     if avg_sim > config.sim_right_sus_threshold and not cheat:
         suspicious = True
         reasons.append(f"轨道相似度过高({similarity_percent:.1f}%)")
-    if avg_sim < config.sim_left_sus_thresholdS and not cheat:
+    if avg_sim < config.sim_left_sus_threshold and not cheat:
         suspicious = True
         reasons.append(f"轨道相似度过低({similarity_percent:.1f}%)")
     if abnormal_peak:
@@ -182,19 +183,78 @@ def analyze_delta_t(osr_obj: osr_file, osu_obj: osu_file):
     cheat = False
     sus = False
     reasons = []
+    risk_score = 0
 
     # 极低标准差且独特值少 → 作弊
     if std < 2.0 and unique_count < 10:
         cheat = True
+        risk_score += 3
         reasons.append(f"delta_t 标准差极小 ({std:.2f}ms) 且独特值少 ({unique_count})")
     elif std < 2.0:
         sus = True
+        risk_score += 2
         reasons.append(f"delta_t 标准差极小 ({std:.2f}ms)")
     elif unique_count < 10:
         sus = True
+        risk_score += 1
         reasons.append(f"delta_t 独特值少 ({unique_count})")
 
-    # 多押同时性检测
+    # 将匹配对按物件时间排序，供序列型特征使用
+    sorted_pairs = sorted(matched_pairs, key=lambda x: x[1])
+    sorted_notes = [n for _, n, _ in sorted_pairs]
+    sorted_deltas = np.array([p - n for _, n, p in sorted_pairs], dtype=float)
+
+    # 高密度区稳定性：真人在高密度下波动通常会增大，脚本常表现过稳
+    if len(sorted_notes) >= 300:
+        radius_ms = config.delta_dense_radius_ms
+        density = []
+        for i, t in enumerate(sorted_notes):
+            l = bisect.bisect_left(sorted_notes, t - radius_ms)
+            r = bisect.bisect_right(sorted_notes, t + radius_ms)
+            density.append(r - l - 1)
+        density_arr = np.array(density, dtype=float)
+
+        high_th = np.percentile(density_arr, 85)
+        low_th = np.percentile(density_arr, 30)
+        high_idx = density_arr >= high_th
+        low_idx = density_arr <= low_th
+
+        if np.sum(high_idx) >= 60 and np.sum(low_idx) >= 60:
+            high_mad = float(np.median(np.abs(sorted_deltas[high_idx] - np.median(sorted_deltas[high_idx]))))
+            low_mad = float(np.median(np.abs(sorted_deltas[low_idx] - np.median(sorted_deltas[low_idx]))))
+            ratio = high_mad / low_mad if low_mad > 1e-6 else 1.0
+
+            if high_mad < config.delta_dense_hard_mad and ratio < config.delta_dense_hard_ratio:
+                sus = True
+                risk_score += 2
+                reasons.append(
+                    f"高密度区波动异常稳定(MAD高密={high_mad:.2f}ms, 比值={ratio:.2f})"
+                )
+            elif high_mad < config.delta_dense_soft_mad and ratio < config.delta_dense_soft_ratio:
+                sus = True
+                risk_score += 1
+                reasons.append(
+                    f"高密度区稳定性偏高(MAD高密={high_mad:.2f}ms, 比值={ratio:.2f})"
+                )
+
+    # 列间一致性：真人常有手/指差异，脚本更容易出现列间统计过于一致
+    col_delta = {}
+    for col, d in delta_list:
+        col_delta.setdefault(col, []).append(float(d))
+    valid_col = {c: np.array(v, dtype=float) for c, v in col_delta.items() if len(v) >= 80}
+    if len(valid_col) >= 3:
+        col_std = np.array([np.std(v) for v in valid_col.values()], dtype=float)
+        col_median = np.array([np.median(v) for v in valid_col.values()], dtype=float)
+        std_cv = float(np.std(col_std) / np.mean(col_std)) if np.mean(col_std) > 1e-6 else 0.0
+        med_span = float(np.max(col_median) - np.min(col_median)) if len(col_median) > 1 else 0.0
+        if std_cv < 0.08 and med_span < 4.0 and std < 9.0:
+            sus = True
+            risk_score += 1
+            reasons.append(
+                f"列间统计过于一致(Std-CV={std_cv:.3f}, 中位差={med_span:.2f}ms)"
+            )
+
+    # 多押同时性检测（基于分布，不使用超分辨率硬阈值）
     # 按物件时间分组（时间差 < 1ms）
     note_times_flat = []
     for col, times in osu_obj.note_times.items():
@@ -214,24 +274,105 @@ def analyze_delta_t(osr_obj: osr_file, osu_obj: osu_file):
         i = j
 
     # 对于每个多押组，找出对应的按下时间
-    # 先建立物件时间到按下时间的映射（从 matched_pairs）
+    # 建立物件时间到按下时间的映射（从 matched_pairs）
     note_to_press = {(col, note): press for col, note, press in matched_pairs}
-    all_chord_sync = True
+    chord_spans = []
     for group in chord_groups:
         press_times = []
         for col, note in group:
             if (col, note) in note_to_press:
                 press_times.append(note_to_press[(col, note)])
         if len(press_times) > 1:
-            max_diff = max(press_times) - min(press_times)
-            if max_diff > 0.05:  # 允许 0.05ms 误差（采样率导致）
-                all_chord_sync = False
-                break
+            chord_spans.append(float(max(press_times) - min(press_times)))
 
-    if all_chord_sync and chord_groups:
-        # 所有多押组中按键时间差极小
+    if chord_spans:
+        chord_spans_arr = np.array(chord_spans)
+        near_sync_ratio = float(np.mean(chord_spans_arr <= 1.2))
+        p90_span = float(np.percentile(chord_spans_arr, 90))
+        p95_span = float(np.percentile(chord_spans_arr, 95))
+        if (
+            len(chord_spans) >= config.delta_chord_hard_min_count
+            and near_sync_ratio >= config.delta_chord_hard_ratio
+            and p95_span <= config.delta_chord_hard_p95
+        ):
+            cheat = True
+            sus = True
+            risk_score += 3
+            reasons.append(
+                f"多押同步性异常高({near_sync_ratio*100:.1f}%, P95跨度={p95_span:.2f}ms)"
+            )
+        elif (
+            len(chord_spans) >= config.delta_chord_soft_min_count
+            and near_sync_ratio >= config.delta_chord_soft_ratio
+            and p90_span <= config.delta_chord_soft_p90
+        ):
+            sus = True
+            risk_score += 2
+            reasons.append(
+                f"多押近同步比例偏高({near_sync_ratio*100:.1f}%, P90跨度={p90_span:.2f}ms)"
+            )
+
+    # 空敲行为画像（仅在长空段上下文统计，避免误伤正常补拍）
+    replay_events = getattr(osr_obj, "press_events_float", None)
+    if not replay_events:
+        replay_events = osr_obj.press_events
+
+    all_notes = [t for times in osu_obj.note_times.values() for t in times]
+    if replay_events and all_notes:
+        min_note = min(all_notes)
+        max_note = max(all_notes)
+        buffer = 5000
+        considered_press_times = [
+            t for _, t in replay_events if min_note - buffer <= t <= max_note + buffer
+        ]
+        total_considered = len(considered_press_times)
+        matched_count = len(matched_pairs)
+        unmatched_ratio = (
+            max(0.0, (total_considered - matched_count) / total_considered)
+            if total_considered > 0 else 0.0
+        )
+
+        sorted_notes = sorted(all_notes)
+        long_gaps = []
+        for i in range(1, len(sorted_notes)):
+            gap_start = sorted_notes[i - 1]
+            gap_end = sorted_notes[i]
+            if gap_end - gap_start >= 1200:
+                long_gaps.append((gap_start + 120, gap_end - 120))
+
+        long_gap_press_count = 0
+        if long_gaps and considered_press_times:
+            starts = [g[0] for g in long_gaps]
+            for t in considered_press_times:
+                idx = bisect.bisect_right(starts, t) - 1
+                if idx >= 0:
+                    g_start, g_end = long_gaps[idx]
+                    if g_start <= t <= g_end:
+                        long_gap_press_count += 1
+
+        long_gap_press_ratio = (
+            (long_gap_press_count / total_considered)
+            if total_considered > 0 else 0.0
+        )
+
+        if (
+            total_considered >= 120
+            and unmatched_ratio > config.delta_gap_unmatched_ratio
+            and long_gap_press_ratio > config.delta_gap_press_ratio
+        ):
+            sus = True
+            risk_score += 1
+            reasons.append(
+                f"长空段空敲画像异常(未匹配率={unmatched_ratio*100:.1f}%, 长空段占比={long_gap_press_ratio*100:.1f}%)"
+            )
+
+    # 多信号融合：避免单特征漏检
+    if not cheat and risk_score >= config.delta_risk_cheat_score:
+        cheat = True
         sus = True
-        reasons.append("多押按键时间几乎同步")
+        reasons.append(f"多项特征叠加异常(风险分={risk_score})")
+    elif not cheat and risk_score >= config.delta_risk_sus_score:
+        sus = True
 
     if not reasons:
         reason = "偏移分析：正常"

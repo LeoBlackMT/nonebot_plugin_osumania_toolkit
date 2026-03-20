@@ -203,7 +203,9 @@ class osr_file:
         self.pressset = [[] for _ in range(18)]
         self.intervals = []
         self.press_times = []
+        self.press_times_float = []
         self.press_events = []
+        self.press_events_float = []
         self.play_data = []
         self.sample_rate = float('inf')
         self.acc = 0.0
@@ -361,8 +363,11 @@ class osr_file:
         self.speed_factor = speed_factor
 
         # 生成实时时间数据（用于分析和绘图）
-        self.press_times = [int(t * corrector) for t in press_times_raw]
-        self.press_events = [(col, int(t * corrector)) for col, t in press_events_raw]
+        # 保留浮点时间用于检测；保留整数毫秒用于绘图与索引操作。
+        self.press_times_float = [t * corrector for t in press_times_raw]
+        self.press_events_float = [(col, t * corrector) for col, t in press_events_raw]
+        self.press_times = [int(round(t)) for t in self.press_times_float]
+        self.press_events = [(col, int(round(t))) for col, t in self.press_events_float]
         self.intervals = [int(w * corrector) for w in intervals_raw]
         self.pressset = [
             [int(d * corrector) for d in col_data] if col_data else []
@@ -440,7 +445,9 @@ class osr_file:
             "ratio": self.ratio,
             "pressset": self.pressset,
             "press_times": self.press_times,
+            "press_times_float": self.press_times_float,
             "press_events": self.press_events,
+            "press_events_float": self.press_events_float,
             "fft_analysis": None,
             "intervals": self.intervals,
             "life_bar_graph": self.life_bar_graph,

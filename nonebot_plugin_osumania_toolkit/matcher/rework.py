@@ -1,7 +1,7 @@
 import os
 import logging
 
-from nonebot import on_command
+from nonebot import on_command, get_plugin_config
 from nonebot.adapters.onebot.v11 import Bot, MessageEvent
 from nonebot.exception import FinishedException
 from pathlib import Path
@@ -11,6 +11,9 @@ from ..algorithm.utils import send_forward_text_messages
 from ..algorithm.rework import get_rework_result_text, get_rework_result, process_zip_file, ParseError, NotManiaError
 from ..algorithm.utils import parse_cmd, is_mc_file, resolve_meta_data
 from ..algorithm.convert import convert_mc_to_osu
+
+from ..config import Config
+config = get_plugin_config(Config)
 
 from nonebot_plugin_localstore import get_plugin_cache_dir
 
@@ -56,7 +59,10 @@ async def handle_rework(bot: Bot, event: MessageEvent):
 
         if not await download_file(file_url, tmp_file):
             logging.warning("Failed to download file '%s' from URL '%s'", file_name, file_url)
-            await rework.finish(f"下载失败：无法获取文件 {file_name}，请检查文件是否存在且机器人有权限访问。")
+            # 检查是否因为文件过大而下载失败
+            if tmp_file.exists():
+                tmp_file.unlink()  # 清理已下载的部分文件
+            await rework.finish(f"下载失败：文件可能过大（限制{config.max_file_size_mb}MB）或链接无效，请检查并重试。")
 
         # 检查文件类型并处理
         try:
@@ -129,7 +135,10 @@ async def handle_rework(bot: Bot, event: MessageEvent):
         except NotManiaError:
             await rework.send("错误: 该谱面不是 mania 模式，无法计算")
         except Exception as e:
-            if "max() iterable argument is empty" in str(e):
+            error_msg = str(e)
+            if "超过 {config.max_file_size_mb}MB 限制" in error_msg or "过大" in error_msg:
+                await rework.send(f"错误: 谱面文件过大（限制{config.max_file_size_mb}MB），无法处理")
+            elif "max() iterable argument is empty" in error_msg:
                 await rework.send(f"错误: 未找到谱面 b{bid}，请检查bid是否正确")
             else:
                 await rework.send(f"错误: {e}")

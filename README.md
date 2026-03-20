@@ -23,14 +23,11 @@
 | omtk_cache_max_age | 否 | int | 24 | 缓存文件最大保留时间（小时） |
 | bin_max_time | 否 | int | 500 | 按压分布直方图最大时间（ms） |
 | bin_width | 否 | int | 1 | 按压分布直方图最大bin数 |
-| sim_right_cheat_threshold | 否 | float | 0.99 | 轨道相似度上作弊阈值（%） |
-| sim_right_sus_threshold | 否 | float | 0.985 | 轨道相似度上可疑阈值（%） |
-| sim_left_cheat_threshold | 否 | float | 0.4 | 轨道相似度下作弊阈值（%） |
-| sim_left_sus_thresholdS | 否 | float | 0.55 | 轨道相似度下可疑阈值（%） |
-| abnormal_peak_threshold | 否 | float | 0.33 | 异常高峰占比阈值（%） |
-| low_sample_rate_threshold | 否 | float | 165 | 低采样率阈值（Hz） |
 | default_convert_od | 否 | int | 8 | .mc转.osu的默认OverallDifficulty值 |
 | default_convert_hp | 否 | int | 8 | .mc转.osu的默认HPDrainRate值 |
+| max_file_size_mb | 否 | int | 50 | 允许处理的最大文件大小（MB） |
+
+注意: 关于作弊分析的相关配置项过多，这里不列出。如有修改需要请查看[配置文件](./config.py)（config.py）
 
 ## Todo
 - ~~计算单曲acc，支持提供谱面自动划分各单曲物量~~
