@@ -173,7 +173,7 @@ def _process_ln_image_sync(image_path, user_d, lzr=False, output_path=None):
     y2 = find_background_upwards(img, bg, x2, mid_y)
     y = max(y1, y2)
 
-    if y > a_true:
+    if y > a_true + 1:
         if lzr:
             a_target = max(0, user_d - 75)
         else:
