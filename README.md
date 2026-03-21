@@ -26,7 +26,7 @@
 | default_convert_hp | 否 | int | 8 | .mc转.osu的默认HPDrainRate值 |
 | max_file_size_mb | 否 | int | 50 | 允许处理的最大文件大小（MB） |
 
-注意: 关于作弊分析的相关配置项过多，这里不列出。如有修改需要请查看[配置文件](.nonebot_plugin_osumania_toolkit/config.py)（config.py）
+注意: 关于作弊分析的相关配置项过多，这里不列出。如有修改需要请查看[配置文件](nonebot_plugin_osumania_toolkit/config.py)（config.py）
 
 ## Todo
 - 添加更多内置段位
