@@ -8,6 +8,7 @@ from .spectrum import spectrum
 from .scatter import scatter
 from .acc import acc
 from .percy import percy
+from .pattern import pattern
 
 __all__ = ["pressingtime",
            "rework",
@@ -18,5 +19,6 @@ __all__ = ["pressingtime",
             "spectrum",
             "scatter",
             "acc",
-            "percy"
+            "percy",
+            "pattern"
            ]

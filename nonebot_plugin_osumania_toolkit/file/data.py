@@ -97,8 +97,9 @@ class omtk_help_data:
         "5. /lifebar 或 /血条 - 血条显示\n"
         "6. /spectrum 或 /频谱 - 频谱显示\n"
         "7. /scatter 或 /散点 - 散点图\n"
-        "8. /percy 或 /投皮 - 投皮修改\n"
-        "9. /acc 或 /单曲 - 单曲ACC计算\n"
+        "8. /pattern 或 /键型 - 谱面键型分析\n"
+        "9. /percy 或 /投皮 - 投皮修改\n"
+        "10. /acc 或 /单曲 - 单曲ACC计算\n"
     )
     # help_text 结构: (命令, 命令名称, 页码, 总页码, 帮助文本)
     help_text = [("rework", "星数重算", "1", "2",
@@ -131,6 +132,9 @@ class omtk_help_data:
             ("scatter", "散点图", "1", "1",
             "你可以使用/scatter (/散点)回复包含 .osr/.mr 文件的消息的同时使用 bid 指定谱面，来显示打击位置的二维散点图。\n命令格式：/scatter [b<bid>]\n示例：/scatter b4094064（同时回复osr）\n"),
 
+            ("pattern", "键型分析", "1", "1",
+            "你可以使用/pattern (/键型)分析谱面键型。当前只支持RC。\n用法1：回复一条包含 .osu/.mc 文件的消息，然后发送 /pattern。\n用法2：直接使用谱面ID：/pattern b<bid>\n示例：/pattern b4094064"),
+
             ("percy", "投皮", "1", "1",
             "你可以使用/percy (/投皮)命令来查看或修改 LN 图片的投机取巧程度。\n用法：回复一条包含 .png 图片文件的消息，同时发送 /percy [d] [lazer|lzr]。（推荐用文件形式发送以避免被qq压缩）\n参数说明：\n1. d：目标投机取巧程度（整数）。不填写时仅识别并返回当前程度。\n2. lazer/lzr：按 Lazer 规则处理与显示（可选）。\n示例：/percy（仅识别当前程度）\n/percy 150（将投皮程度调整到 150px）\n/percy 225 lzr（按 Lazer 模式调整）\n注意:\n1. Lazer 模式会进行 -75px 修正（下限 0），同时将图片长度固定在32800px。\n2. 本程序暂不支持渐变颜色面身、非单一颜色或含有图案面身的皮肤。\n3. 请确保回复的图片文件为 .png 格式。\n\n如果你需要批处理等高级功能，请前往仓库LeoBlackMT/percy_skin_editor"),
             
@@ -150,6 +154,7 @@ class omtk_help_data:
         "血条": "lifebar",
         "频谱": "spectrum",
         "散点": "scatter",
+        "键型": "pattern",
         "投皮": "percy",
         "单曲": "acc"
         }
