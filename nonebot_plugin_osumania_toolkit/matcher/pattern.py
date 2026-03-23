@@ -95,7 +95,10 @@ async def handle_pattern(bot: Bot, event: MessageEvent):
 
             tmp_file = CACHE_DIR / file_name
             if not await download_file(file_url, tmp_file):
-                await pattern.finish("下载失败：文件可能过大或链接无效，请检查并重试。")
+                await pattern.finish(
+                    "下载失败：文件可能过大或链接无效，请检查并重试。\n"
+                    "建议：可以删除图包内的媒体文件（音频/背景视频/图片）后再重新打包上传。"
+                )
 
             if file_name.lower().endswith((".osz", ".mcz")):
                 await pattern.send(f"已收到图包：{file_name}，正在分析，请稍候...")
@@ -116,7 +119,7 @@ async def handle_pattern(bot: Bot, event: MessageEvent):
             await send_forward_text_messages(bot, event, result_texts)
             await pattern.finish()
         else:
-            await pattern.finish("请回复包含 .osu/.mc/.osz/.mcz 文件的消息，或使用 bid 指定谱面。")
+            await pattern.finish("请回复包含 .osu/.mc/.osz/.mcz 文件的消息，或使用 bid/mania 谱面网址指定谱面。")
 
     except FinishedException:
         raise
@@ -125,7 +128,14 @@ async def handle_pattern(bot: Bot, event: MessageEvent):
     except PatternParseError as e:
         await pattern.finish(f"谱面解析失败：{e}")
     except Exception as e:
-        await pattern.finish(f"键型分析失败：{e}")
+        error_text = str(e)
+        if "超过" in error_text or "过大" in error_text:
+            await pattern.finish(
+                "键型分析失败：文件过大。\n"
+                "建议：可以删除图包内的媒体文件（音频/背景视频/图片）后再重新打包上传。"
+            )
+        else:
+            await pattern.finish(f"键型分析失败：{e}")
     finally:
         if tmp_file and tmp_file.exists():
             tmp_file.unlink()

@@ -62,7 +62,10 @@ async def handle_rework(bot: Bot, event: MessageEvent):
             # 检查是否因为文件过大而下载失败
             if tmp_file.exists():
                 tmp_file.unlink()  # 清理已下载的部分文件
-            await rework.finish(f"下载失败：文件可能过大（限制{config.max_file_size_mb}MB）或链接无效，请检查并重试。")
+            await rework.finish(
+                f"下载失败：文件可能过大（限制{config.max_file_size_mb}MB）或链接无效，请检查并重试。\n"
+                "建议：可以删除图包内的媒体文件（音频/背景视频/图片）后再重新打包上传。"
+            )
 
         # 检查文件类型并处理
         try:
@@ -118,7 +121,7 @@ async def handle_rework(bot: Bot, event: MessageEvent):
         return
     
     elif bid is None:
-        await rework.finish("请回复包含 .osu 或 .mc 文件的消息，或使用 bid 指定谱面。")
+        await rework.finish("请回复包含 .osu 或 .mc 文件的消息，或使用 bid/mania 谱面网址指定谱面。")
     
     else:
         try:
@@ -137,7 +140,10 @@ async def handle_rework(bot: Bot, event: MessageEvent):
         except Exception as e:
             error_msg = str(e)
             if "超过 {config.max_file_size_mb}MB 限制" in error_msg or "过大" in error_msg:
-                await rework.send(f"错误: 谱面文件过大（限制{config.max_file_size_mb}MB），无法处理")
+                await rework.send(
+                    f"错误: 谱面文件过大（限制{config.max_file_size_mb}MB），无法处理\n"
+                    "建议：可以删除图包内的媒体文件（音频/背景视频/图片）后再重新打包上传。"
+                )
             elif "max() iterable argument is empty" in error_msg:
                 await rework.send(f"错误: 未找到谱面 b{bid}，请检查bid是否正确")
             else:

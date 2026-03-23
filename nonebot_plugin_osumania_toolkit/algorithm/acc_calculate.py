@@ -5,6 +5,7 @@ from pathlib import Path
 
 from ..file.osu_file_parser import osu_file
 from ..file.data import dan_data
+from .utils import parse_bid_or_url
 
 # ==================== 计算函数 ====================
 
@@ -244,12 +245,14 @@ def parse_acc_cmd(cmd_text: str) -> Tuple:
             i += 1
             continue
         
-        # 获取bid
-        if part.lower().startswith("b"):
-            try:
-                bid = int(part[1:])
-            except ValueError:
-                err_msg.append(f"无效的谱面ID: {part[1:]}; ")
+        # 获取bid（支持 b<bid> 或 mania 谱面网址）
+        parsed_bid, bid_err = parse_bid_or_url(part)
+        if bid_err is not None:
+            err_msg.append(f"{bid_err}; ")
+            i += 1
+            continue
+        if parsed_bid is not None:
+            bid = parsed_bid
             i += 1
             continue
         

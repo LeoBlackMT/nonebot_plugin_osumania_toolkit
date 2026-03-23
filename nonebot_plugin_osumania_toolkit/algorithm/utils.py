@@ -2,6 +2,7 @@ import bisect
 import json
 import zipfile
 import os
+import re
 
 from nonebot.log import logger
 from pathlib import Path
@@ -17,6 +18,41 @@ from nonebot.adapters.onebot.v11 import (
     MessageSegment,
     PrivateMessageEvent,
 )
+
+_OSU_BEATMAPSET_URL_RE = re.compile(
+    r"^https?://osu\.ppy\.sh/beatmapsets/\d+#(?P<mode>[A-Za-z0-9_]+)/(?P<bid>\d+)(?:[/?].*)?$",
+    re.IGNORECASE,
+)
+
+
+def parse_bid_or_url(part: str) -> tuple[int | None, str | None]:
+    """Parse b<bid> or osu beatmapset URL into bid.
+
+    Returns:
+        (bid, error_message). If parsing does not apply, returns (None, None).
+    """
+    token = part.strip()
+
+    # b<bid>
+    if token.lower().startswith("b") and len(token) > 1:
+        try:
+            return int(token[1:]), None
+        except ValueError:
+            return None, f"无效的谱面ID: {token[1:]}"
+
+    # https://osu.ppy.sh/beatmapsets/<sid>#<mode>/<bid>
+    m = _OSU_BEATMAPSET_URL_RE.fullmatch(token)
+    if m:
+        mode = m.group("mode").lower()
+        if mode != "mania":
+            return None, f"仅支持 mania 谱面链接，当前模式为 {mode}"
+        return int(m.group("bid")), None
+
+    # Other osu beatmapset URLs are treated as invalid input to avoid silent fallback.
+    if token.lower().startswith("https://osu.ppy.sh/beatmapsets/") or token.lower().startswith("http://osu.ppy.sh/beatmapsets/"):
+        return None, "谱面链接格式无效，请使用 https://osu.ppy.sh/beatmapsets/<sid>#mania/<bid>"
+
+    return None, None
 
 async def send_forward_text_messages(bot: Bot, event: MessageEvent, texts: list[str], nickname: str = "Bot"):
     """发送合并转发消息，适用于文本较多的情况"""
@@ -297,12 +333,14 @@ def parse_cmd(cmd_text: str):
             i += 1
             continue
 
-        # 获取bid
-        if part.lower().startswith("b"):
-            try:
-                bid = int(part[1:])
-            except ValueError:
-                err_msg.append(f"无效的谱面ID: {part[1:]}; ")
+        # 获取bid（支持 b<bid> 或 mania 谱面网址）
+        parsed_bid, bid_err = parse_bid_or_url(part)
+        if bid_err is not None:
+            err_msg.append(f"{bid_err}; ")
+            i += 1
+            continue
+        if parsed_bid is not None:
+            bid = parsed_bid
             i += 1
             continue
 
