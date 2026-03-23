@@ -41,22 +41,21 @@ CORE_RATING_MULTIPLIER: dict[str, float] = {
 # 子类倍率覆盖。若子类不在该表中，会回退到对应 CorePattern 的倍率。
 SUBTYPE_RATING_MULTIPLIER: dict[str, float] = {
     # Coordination
-    "Column Lock": 0.75,
-    "Release": 0.8,
-    "Shield": 0.7,
+    "Column Lock": 1.5,
+    "Release": 0.73,
+    "Shield": 0.8,
 
     # Density
-    "JS Density": 0.95,
-    "HS Density": 1.10,
-    "DS Density": 0.90,
-    "LCS Density": 0.85,
-    "DCS Density": 0.95,
-    "Inverse": 0.8,
+    "JS Density": 1.0,
+    "HS Density": 1.0,
+    "DS Density": 1.0,
+    "LCS Density": 1.0,
+    "DCS Density": 1.0,
+    "Inverse": 1.5,
 
     # Wildcard
-    "Jacky WC": 1.1,
-    "Speedy WC": 0.65,
-    "TimingHell": 0.8,
+    "Jacky WC": 0.55,
+    "Speedy WC": 0.8,
 }
 
 
@@ -88,6 +87,34 @@ SV_AMOUNT_THRESHOLD = 2000.0
 # 例如设为 0.4 表示第一名子类至少 40% 才显示，否则显示 CorePattern 名称。
 CLUSTER_SPECIFIC_NAME_MIN_RATIO = 0.0
 
+# 同一窗口内是否保留同一大类的多个子类标签。
+# True：同窗内多个 recogniser 同时命中时全部保留（用于观察“吞标签”现象）。
+# False：保持旧行为，只保留顺序上的第一个命中标签。
+ENABLE_MULTI_LABEL_SAME_WINDOW = True
+
+# 三大新增类（Coordination / Density / Wildcard）内部子类匹配顺序。
+# 仅影响“同一大类内部”优先级，不影响大类之间（Stream/Chordstream/Jacks 等）。
+# 可以直接改列表顺序来调试“先命中谁”。
+COORDINATION_SPECIFIC_ORDER: list[str] = [
+    "Column Lock",
+    "Shield",
+    "Release",
+]
+
+DENSITY_SPECIFIC_ORDER: list[str] = [
+    "Inverse",
+    "JS Density",
+    "HS Density",
+    "DS Density",
+    "DCS Density",
+    "LCS Density",
+]
+
+WILDCARD_SPECIFIC_ORDER: list[str] = [
+    "Speedy WC",
+    "Jacky WC",
+]
+
 
 # -----------------------------
 # 识别器相关（可用于微调判定松紧）
@@ -105,45 +132,20 @@ INVERSE_GAP_TOLERANCE_MS = 30.0
 # Inverse 判定：窗口内 LN Body 最少覆盖列数。
 INVERSE_MIN_FILLED_LANES = 3
 
-# TimingHell 的 grace 间隔窗口（按 beat 比例）。
-GRACE_MIN_BEAT_RATIO = 1.0 / 20.0
-GRACE_MAX_BEAT_RATIO = 1.0 / 4.0
-
-# TimingHell：LN 上下文检测窗口。
-TIMINGHELL_CONTEXT_WINDOW = 8
-
-# TimingHell：最少需要的窗口行数。
-TIMINGHELL_MIN_ROWS = 2
-
-# TimingHell：是否要求 grace-like 通过。
-# 设为 False 可大幅放宽：只要满足释放密度/抖动条件即可命中。
-TIMINGHELL_REQUIRE_GRACE = True
-
-# TimingHell：尾部释放间隔判定阈值（按 beat 比例）。
-# 数值越大越宽松，例如 1/2 比 1/3 更宽松。
-TIMINGHELL_TAIL_DELTA_BEAT_RATIO = 1.0 / 2.0
-
-# TimingHell：尾部释放样本最少数量。
-TIMINGHELL_MIN_TAIL_ROWS = 2
-
-# TimingHell：抖动容忍阈值（ms）。
-# 相邻释放间隔差异超过该值时，会被视作 timing 不稳定特征。
-TIMINGHELL_JITTER_THRESHOLD_MS = 18.0
-
 # Release：从窗口前多少行里找单尾（len(LNTails)==1）。
-RELEASE_SCAN_ROWS = 7
+RELEASE_SCAN_ROWS = 4
 
 # Release：至少需要多少个单尾点才能继续判定。
-RELEASE_MIN_TAIL_ROWS = 2
+RELEASE_MIN_TAIL_ROWS = 4
 
 # Release：用于判定 roll 的最小点数（给 STREAM_4K_ROLL 的长度）。
-RELEASE_ROLL_POINTS = 3
+RELEASE_ROLL_POINTS = 2
 
 # Release：达到该点数时返回更长匹配长度（更稳定的 Release 段）。
-RELEASE_FULL_MATCH_ROWS = 4
+RELEASE_FULL_MATCH_ROWS = 5
 
 # Jacky WC：LN 上下文检测窗口。
-JACKY_CONTEXT_WINDOW = 2
+JACKY_CONTEXT_WINDOW = 6
 
 # Jacky WC 放宽分支：当有连续 jack 且速度足够快时可判定。
-JACKY_FALLBACK_MAX_MSPB = 170.0
+JACKY_FALLBACK_MAX_MSPB = 185.0

@@ -15,9 +15,9 @@ from enum import Enum
 from typing import Callable, List, Tuple
 
 from .config import (
+    COORDINATION_SPECIFIC_ORDER,
     CORE_RATING_MULTIPLIER,
-    GRACE_MAX_BEAT_RATIO,
-    GRACE_MIN_BEAT_RATIO,
+    DENSITY_SPECIFIC_ORDER,
     INVERSE_GAP_TOLERANCE_MS,
     INVERSE_MIN_FILLED_LANES,
     JACKY_CONTEXT_WINDOW,
@@ -29,12 +29,7 @@ from .config import (
     RELEASE_SCAN_ROWS,
     SHIELD_MAX_BEAT_RATIO,
     SUBTYPE_RATING_MULTIPLIER,
-    TIMINGHELL_CONTEXT_WINDOW,
-    TIMINGHELL_JITTER_THRESHOLD_MS,
-    TIMINGHELL_MIN_ROWS,
-    TIMINGHELL_MIN_TAIL_ROWS,
-    TIMINGHELL_REQUIRE_GRACE,
-    TIMINGHELL_TAIL_DELTA_BEAT_RATIO,
+    WILDCARD_SPECIFIC_ORDER,
 )
 from .primitives import RowInfo, Direction, detect_direction
 
@@ -62,6 +57,18 @@ def resolve_rating_multiplier(pattern: CorePattern, specific_type: str | None) -
     return SUBTYPE_RATING_MULTIPLIER.get(specific_type, pattern.RatingMultiplier)
 
 PatternRecogniser = Callable[[List[RowInfo]], int]
+
+
+def _reorder_specific(
+    items: List[Tuple[str, PatternRecogniser]],
+    preferred_order: List[str],
+) -> List[Tuple[str, PatternRecogniser]]:
+    if len(items) <= 1 or len(preferred_order) == 0:
+        return items
+    order_rank = {name: idx for idx, name in enumerate(preferred_order)}
+    with_index = list(enumerate(items))
+    with_index.sort(key=lambda pair: (order_rank.get(pair[1][0], len(order_rank)), pair[0]))
+    return [item for _, item in with_index]
 
 
 def _as_head_point_row(row: RowInfo, previous_head_cols: List[int]) -> RowInfo:
@@ -124,31 +131,6 @@ def _has_ln_context(xs: List[RowInfo], window: int) -> bool:
         if len(row.LNHeads) > 0 or len(row.LNBodies) > 0 or len(row.LNTails) > 0:
             return True
     return False
-
-
-def _is_grace_like(head_rows: List[RowInfo]) -> bool:
-    events: List[Tuple[float, int, float]] = []
-    for row in head_rows:
-        for col in row.RawNotes:
-            events.append((row.Time, col, row.BeatLength))
-    events.sort(key=lambda x: x[0])
-    if len(events) < 2:
-        return False
-    cols = {c for _, c, _ in events}
-    if len(cols) < 2:
-        return False
-
-    for i in range(len(events) - 1):
-        t0, _, beat = events[i]
-        t1, _, _ = events[i + 1]
-        delta = t1 - t0
-        if delta <= 0:
-            return False
-        low = beat * GRACE_MIN_BEAT_RATIO
-        high = beat * GRACE_MAX_BEAT_RATIO
-        if not (low <= delta <= high):
-            return False
-    return True
 
 
 def _inverse_ready(xs: List[RowInfo]) -> bool:
@@ -544,6 +526,14 @@ def COORDINATION_RELEASE(xs: List[RowInfo]) -> int:
     if len(xs) < RELEASE_MIN_TAIL_ROWS:
         return 0
 
+    # 互斥：当前窗口若已命中 Shield / Inverse / JackyWC，则不判定为 Release。
+    if COORDINATION_SHIELD(xs) != 0:
+        return 0
+    if _inverse_ready(xs):
+        return 0
+    if WILDCARD_JACK(xs) != 0:
+        return 0
+
     picked_rows = [r for r in xs[:RELEASE_SCAN_ROWS] if len(r.LNTails) == 1]
     if len(picked_rows) < RELEASE_MIN_TAIL_ROWS:
         return 0
@@ -577,11 +567,23 @@ def COORDINATION_RELEASE(xs: List[RowInfo]) -> int:
         )
         prev = cur
 
-    if len(rows) < RELEASE_ROLL_POINTS:
+    # 第 1 行 direction 基本是占位值（prev==cur），实际判定从第 2 行开始。
+    effective_rows = rows[1:] if len(rows) > 1 else []
+    if len(effective_rows) < RELEASE_ROLL_POINTS:
         return 0
 
-    # 允许 3 点尾部序列命中；达到完整点数时仍返回更长长度。
-    if STREAM_4K_ROLL(rows[:RELEASE_ROLL_POINTS]) != 0:
+    matched = False
+    if RELEASE_ROLL_POINTS >= 3:
+        # 经典 3 点滚动判定。
+        matched = STREAM_4K_ROLL(effective_rows[:RELEASE_ROLL_POINTS]) != 0
+    else:
+        # RELEASE_ROLL_POINTS=2 时使用二点释放切换判定。
+        a = effective_rows[0].RawNotes[0]
+        b = effective_rows[1].RawNotes[0] if len(effective_rows) > 1 else a
+        dt = effective_rows[1].Time - effective_rows[0].Time if len(effective_rows) > 1 else 0.0
+        matched = a != b and dt > 0
+
+    if matched:
         return 5 if use_rows >= RELEASE_FULL_MATCH_ROWS else 4
     return 0
 
@@ -673,17 +675,26 @@ def DENSITY_Other_INVERSE(xs: List[RowInfo]) -> int:
 # -----------------------------
 
 def WILDCARD_JACK(xs: List[RowInfo]) -> int:
-    if len(xs) < 3 or not _has_ln_context(xs, JACKY_CONTEXT_WINDOW):
+    if len(xs) < 2 or not _has_ln_context(xs, JACKY_CONTEXT_WINDOW):
         return 0
-    rows = _head_rows(xs, min(4, len(xs)))
+
+    # JackyWC 不再仅依赖 LNHeads 派生行，避免把有效 jack 信息过滤掉。
+    rows = [r for r in xs[: max(4, JACKY_CONTEXT_WINDOW)] if r.Notes > 0]
+    if len(rows) < 2:
+        return 0
+
     if JACKS_CHORDJACKS(rows) != 0 or JACKS_MINIJACKS(rows) != 0:
         return 4
-    # 3 行内至少 2 行出现 jack，且存在一行双押以上。
-    jack_rows = sum(1 for r in rows[:3] if r.Jacks > 0)
-    if jack_rows >= 2 and any(r.Notes >= 2 for r in rows[:3]):
+
+    check_rows = rows[: min(4, len(rows))]
+    # 近窗内至少 2 行出现 jack，且存在一行双押以上。
+    jack_rows = sum(1 for r in check_rows if r.Jacks > 0)
+    if jack_rows >= 2 and any(r.Notes >= 2 for r in check_rows):
         return 3
+
     # 高速连续 jack 也可判定。
-    if jack_rows >= 2 and rows[0].MsPerBeat <= JACKY_FALLBACK_MAX_MSPB:
+    fastest_mspb = min(r.MsPerBeat for r in check_rows)
+    if jack_rows >= 2 and fastest_mspb <= JACKY_FALLBACK_MAX_MSPB:
         return 3
     return 0
 
@@ -711,45 +722,6 @@ def WILDCARD_SPEED(xs: List[RowInfo]) -> int:
     return 0
 
 
-def WILDCARD_TIMING_HELL(xs: List[RowInfo]) -> int:
-    if len(xs) < TIMINGHELL_MIN_ROWS or not _has_ln_context(xs, TIMINGHELL_CONTEXT_WINDOW):
-        return 0
-
-    # 互斥：若该窗口已符合 Inverse 或 Speedy WC，则忽略 TimingHell。
-    if _inverse_ready(xs):
-        return 0
-    if WILDCARD_SPEED(xs) != 0:
-        return 0
-
-    rows = _head_rows(xs, min(TIMINGHELL_CONTEXT_WINDOW, len(xs)))
-    if TIMINGHELL_REQUIRE_GRACE and not _is_grace_like(rows):
-        return 0
-
-    # 优先沿用 Release；若未命中，则只要短窗口内存在连续释放也可判定。
-    if len(xs) >= 5 and COORDINATION_RELEASE(xs[:5]) != 0:
-        return 5
-
-    tail_rows = [r for r in xs[:TIMINGHELL_CONTEXT_WINDOW] if len(r.LNTails) > 0]
-    if len(tail_rows) >= TIMINGHELL_MIN_TAIL_ROWS:
-        deltas = [tail_rows[i + 1].Time - tail_rows[i].Time for i in range(len(tail_rows) - 1)]
-        if any(d > 0 and d <= tail_rows[i + 1].BeatLength * TIMINGHELL_TAIL_DELTA_BEAT_RATIO for i, d in enumerate(deltas)):
-            return 5
-        if len(deltas) >= 2:
-            jitter = max(deltas) - min(deltas)
-            if jitter >= TIMINGHELL_JITTER_THRESHOLD_MS:
-                return 5
-
-    # 最宽松：如果窗口内 LN 尾+头切换频繁，也算 TimingHell 倾向。
-    switch_count = 0
-    for row in xs[:TIMINGHELL_CONTEXT_WINDOW]:
-        if len(row.LNTails) > 0 and len(row.LNHeads) > 0:
-            switch_count += 1
-    if switch_count >= 2:
-            return 5
-
-    return 0
-
-
 # -----------------------------
 # SpecificPatterns record（对应 F# type SpecificPatterns with 3 static members）
 # -----------------------------
@@ -765,6 +737,30 @@ class SpecificPatterns:
 
 
 def SPECIFIC_4K() -> SpecificPatterns:
+    coordination = _reorder_specific(
+        [
+            ("Column Lock", COORDINATION_COLUMN_LOCK),
+            ("Release", COORDINATION_RELEASE),
+            ("Shield", COORDINATION_SHIELD),
+        ],
+        COORDINATION_SPECIFIC_ORDER,
+    )
+    density = _reorder_specific(
+        [
+            ("JS Density", DENSITY_4K_JUMPSTREAM),
+            ("HS Density", DENSITY_4K_HANDSTREAM),
+            ("Inverse", DENSITY_4K_INVERSE),
+        ],
+        DENSITY_SPECIFIC_ORDER,
+    )
+    wildcard = _reorder_specific(
+        [
+            ("Jacky WC", WILDCARD_JACK),
+            ("Speedy WC", WILDCARD_SPEED),
+        ],
+        WILDCARD_SPECIFIC_ORDER,
+    )
+
     return SpecificPatterns(
         Stream=[
             ("Rolls", STREAM_4K_ROLL),
@@ -787,25 +783,38 @@ def SPECIFIC_4K() -> SpecificPatterns:
             ("Chordjacks", JACKS_CHORDJACKS),
             ("Minijacks", JACKS_MINIJACKS),
         ],
-        Coordination=[
-            ("Column Lock", COORDINATION_COLUMN_LOCK),
-            ("Release", COORDINATION_RELEASE),
-            ("Shield", COORDINATION_SHIELD),
-        ],
-        Density=[
-            ("JS Density", DENSITY_4K_JUMPSTREAM),
-            ("HS Density", DENSITY_4K_HANDSTREAM),
-            ("Inverse", DENSITY_4K_INVERSE),
-        ],
-        Wildcard=[
-            ("Jacky WC", WILDCARD_JACK),
-            ("Speedy WC", WILDCARD_SPEED),
-            ("TimingHell", WILDCARD_TIMING_HELL),
-        ],
+        Coordination=coordination,
+        Density=density,
+        Wildcard=wildcard,
     )
 
 
 def SPECIFIC_7K() -> SpecificPatterns:
+    coordination = _reorder_specific(
+        [
+            ("Column Lock", COORDINATION_COLUMN_LOCK),
+            ("Release", COORDINATION_RELEASE),
+            ("Shield", COORDINATION_SHIELD),
+        ],
+        COORDINATION_SPECIFIC_ORDER,
+    )
+    density = _reorder_specific(
+        [
+            ("DS Density", DENSITY_7K_DOUBLE_STREAMS),
+            ("DCS Density", DENSITY_7K_DENSE_CHORDSTREAM),
+            ("LCS Density", DENSITY_7K_LIGHT_CHORDSTREAM),
+            ("Inverse", DENSITY_7K_INVERSE),
+        ],
+        DENSITY_SPECIFIC_ORDER,
+    )
+    wildcard = _reorder_specific(
+        [
+            ("Jacky WC", WILDCARD_JACK),
+            ("Speedy WC", WILDCARD_SPEED),
+        ],
+        WILDCARD_SPECIFIC_ORDER,
+    )
+
     return SpecificPatterns(
         Stream=[],
         Chordstream=[
@@ -820,26 +829,38 @@ def SPECIFIC_7K() -> SpecificPatterns:
             ("Chordjacks", JACKS_CHORDJACKS),
             ("Minijacks", JACKS_MINIJACKS),
         ],
-        Coordination=[
-            ("Column Lock", COORDINATION_COLUMN_LOCK),
-            ("Release", COORDINATION_RELEASE),
-            ("Shield", COORDINATION_SHIELD),
-        ],
-        Density=[
-            ("DS Density", DENSITY_7K_DOUBLE_STREAMS),
-            ("DCS Density", DENSITY_7K_DENSE_CHORDSTREAM),
-            ("LCS Density", DENSITY_7K_LIGHT_CHORDSTREAM),
-            ("Inverse", DENSITY_7K_INVERSE),
-        ],
-        Wildcard=[
-            ("Jacky WC", WILDCARD_JACK),
-            ("Speedy WC", WILDCARD_SPEED),
-            ("TimingHell", WILDCARD_TIMING_HELL),
-        ],
+        Coordination=coordination,
+        Density=density,
+        Wildcard=wildcard,
     )
 
 
 def SPECIFIC_OTHER() -> SpecificPatterns:
+    coordination = _reorder_specific(
+        [
+            ("Column Lock", COORDINATION_COLUMN_LOCK),
+            ("Release", COORDINATION_RELEASE),
+            ("Shield", COORDINATION_SHIELD),
+        ],
+        COORDINATION_SPECIFIC_ORDER,
+    )
+    density = _reorder_specific(
+        [
+            ("DS Density", DENSITY_Other_DOUBLE_STREAMS),
+            ("DCS Density", DENSITY_Other_DENSE_CHORDSTREAM),
+            ("LCS Density", DENSITY_Other_LIGHT_CHORDSTREAM),
+            ("Inverse", DENSITY_Other_INVERSE),
+        ],
+        DENSITY_SPECIFIC_ORDER,
+    )
+    wildcard = _reorder_specific(
+        [
+            ("Jacky WC", WILDCARD_JACK),
+            ("Speedy WC", WILDCARD_SPEED),
+        ],
+        WILDCARD_SPECIFIC_ORDER,
+    )
+
     return SpecificPatterns(
         Stream=[],
         Chordstream=[
@@ -853,20 +874,7 @@ def SPECIFIC_OTHER() -> SpecificPatterns:
             ("Chordjacks", JACKS_CHORDJACKS),
             ("Minijacks", JACKS_MINIJACKS),
         ],
-        Coordination=[
-            ("Column Lock", COORDINATION_COLUMN_LOCK),
-            ("Release", COORDINATION_RELEASE),
-            ("Shield", COORDINATION_SHIELD),
-        ],
-        Density=[
-            ("DS Density", DENSITY_Other_DOUBLE_STREAMS),
-            ("DCS Density", DENSITY_Other_DENSE_CHORDSTREAM),
-            ("LCS Density", DENSITY_Other_LIGHT_CHORDSTREAM),
-            ("Inverse", DENSITY_Other_INVERSE),
-        ],
-        Wildcard=[
-            ("Jacky WC", WILDCARD_JACK),
-            ("Speedy WC", WILDCARD_SPEED),
-            ("TimingHell", WILDCARD_TIMING_HELL),
-        ],
+        Coordination=coordination,
+        Density=density,
+        Wildcard=wildcard,
     )
