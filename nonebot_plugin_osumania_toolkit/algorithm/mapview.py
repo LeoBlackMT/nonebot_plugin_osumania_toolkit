@@ -1,0 +1,319 @@
+import os
+import shutil
+import time
+from pathlib import Path
+from typing import Any
+from nonebot import require
+
+require("nonebot_plugin_htmlkit")
+from nonebot_plugin_htmlkit import template_to_pic  # type: ignore[import-not-found]
+
+from .convert import convert_mc_to_osu
+from .patterns import PatternNotManiaError, PatternParseError, analyze_pattern_file
+from .rework import ParseError, NotManiaError, est_diff, get_rework_result
+from .utils import extract_zip_file, is_mc_file, resolve_meta_data
+
+
+STAR_BG_STOPS = [
+    (0.0, "#aaaaaa"),
+    (0.9, "#4bb3fd"),
+    (2.0, "#4fffd5"),
+    (3.0, "#d3f557"),
+    (4.0, "#fda265"),
+    (5.0, "#f94d79"),
+    (6.0, "#b64cc1"),
+    (7.0, "#5654ca"),
+    (8.0, "#14117d"),
+    (9.0, "#000000"),
+    (9999.9, "#000000"),
+]
+
+STAR_TEXT_STOPS = [
+    (0.0, "#000000"),
+    (6.49, "#000000"),
+    (6.5, "#ffd966"),
+    (8.9, "#ffd966"),
+    (9.0, "#f6f05c"),
+    (10.0, "#ff7a69"),
+    (11.0, "#e74a95"),
+    (12.0, "#9a57ce"),
+    (12.39, "#6563de"),
+    (9999.9, "#6563de"),
+]
+
+async def render_analysis_card(TEMPLATE_DIR: Path, data: dict) -> bytes:
+    image_bytes = await template_to_pic(
+        template_path=TEMPLATE_DIR,
+        template_name="index.html",
+        templates=data,
+        max_width=475,
+        device_height=490,
+        allow_refit=False,
+    )
+    return image_bytes
+
+def _specific_types_text(specific_types: list[tuple[str, float]]) -> str:
+    if not specific_types:
+        return ""
+    return ", ".join(f"{name} ({ratio * 100:.1f}%)" for name, ratio in specific_types)
+
+
+def _hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
+    color = hex_color.lstrip("#")
+    if len(color) == 3:
+        color = "".join(ch + ch for ch in color)
+    value = int(color, 16)
+    return ((value >> 16) & 255, (value >> 8) & 255, value & 255)
+
+
+def _rgb_to_hex(r: int, g: int, b: int) -> str:
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
+def _interpolate_color(hex_a: str, hex_b: str, t: float) -> str:
+    ar, ag, ab = _hex_to_rgb(hex_a)
+    br, bg, bb = _hex_to_rgb(hex_b)
+    r = round(ar + (br - ar) * t)
+    g = round(ag + (bg - ag) * t)
+    b = round(ab + (bb - ab) * t)
+    return _rgb_to_hex(r, g, b)
+
+
+def _color_for(value: float, stops: list[tuple[float, str]], fallback: str) -> str:
+    if not isinstance(value, (int, float)):
+        return fallback
+    if value <= stops[0][0]:
+        return stops[0][1]
+    for i in range(len(stops) - 1):
+        lv, lc = stops[i]
+        rv, rc = stops[i + 1]
+        if lv <= value <= rv:
+            t = (value - lv) / (rv - lv or 1.0)
+            return _interpolate_color(lc, rc, t)
+    return stops[-1][1]
+
+
+def _relative_luminance(hex_color: str) -> float:
+    r, g, b = _hex_to_rgb(hex_color)
+
+    def convert(v: int) -> float:
+        c = v / 255.0
+        if c <= 0.03928:
+            return c / 12.92
+        return ((c + 0.055) / 1.055) ** 2.4
+
+    return 0.2126 * convert(r) + 0.7152 * convert(g) + 0.0722 * convert(b)
+
+
+def _contrast_ratio(hex_a: str, hex_b: str) -> float:
+    l1 = _relative_luminance(hex_a)
+    l2 = _relative_luminance(hex_b)
+    bright = max(l1, l2)
+    dark = min(l1, l2)
+    return (bright + 0.05) / (dark + 0.05)
+
+
+def _pick_readable_text_color(star_value: float, bg_color: str, preferred_color: str) -> str:
+    if isinstance(star_value, (int, float)) and star_value > 12:
+        return "#6563de"
+
+    preferred = preferred_color or "#f6fbff"
+    if _contrast_ratio(bg_color, preferred) >= 4.5:
+        return preferred
+
+    candidate_dark = "#111111"
+    candidate_light = "#f6fbff"
+    candidate_gold = "#FFD966"
+
+    dark_ratio = _contrast_ratio(bg_color, candidate_dark)
+    light_ratio = _contrast_ratio(bg_color, candidate_light)
+    gold_ratio = _contrast_ratio(bg_color, candidate_gold)
+
+    if 7.0 <= star_value <= 10.0:
+        if gold_ratio >= 4.5:
+            return candidate_gold
+        return candidate_light if light_ratio >= dark_ratio else candidate_dark
+
+    if dark_ratio >= 4.5 or dark_ratio > light_ratio:
+        return candidate_dark
+    return candidate_light
+
+
+def _merge_duplicate_clusters(clusters: list[Any]) -> list[dict[str, Any]]:
+    merged: dict[str, dict[str, Any]] = {}
+
+    for cluster in clusters:
+        key = cluster.Pattern.value
+        if key not in merged:
+            merged[key] = {
+                "label": key,
+                "amount": 0.0,
+                "specific": {},
+            }
+
+        row = merged[key]
+        amount = float(cluster.Amount or 0.0)
+        row["amount"] += amount
+
+        for name, ratio in list(cluster.SpecificTypes or []):
+            weighted = float(ratio or 0.0) * amount
+            row["specific"][name] = row["specific"].get(name, 0.0) + weighted
+
+    out: list[dict[str, Any]] = []
+    for row in merged.values():
+        total = row["amount"] if row["amount"] > 0 else 1.0
+        normalized = sorted(
+            [(name, weighted / total) for name, weighted in row["specific"].items()],
+            key=lambda x: x[1],
+            reverse=True,
+        )
+        out.append(
+            {
+                "label": row["label"],
+                "amount": row["amount"],
+                "subtype": _specific_types_text(normalized) or "-",
+            }
+        )
+
+    out.sort(key=lambda x: x["amount"], reverse=True)
+    return out
+
+
+def _format_diff_for_display(diff_text: str) -> str:
+    return " ".join(str(diff_text).split())
+
+
+def _split_diff_lines(diff_text: str) -> tuple[str, str | None]:
+    clean = _format_diff_for_display(diff_text)
+    if "||" not in clean:
+        return clean, None
+
+    left, right = clean.split("||", 1)
+    top = left.strip()
+    bottom = right.strip()
+    return (top or "-"), (bottom or "-")
+
+
+def _render_meta_title(meta_data: Any) -> str:
+    if isinstance(meta_data, dict):
+        need = {"Creator", "Artist", "Title", "Version"}
+        if need.issubset(meta_data.keys()):
+            return f"{meta_data['Artist']} - {meta_data['Title']} [{meta_data['Version']}] // {meta_data['Creator']}"
+    return "*Failed to parse meta data*"
+
+
+async def analyze_mapview_chart(
+    chart_file: Path,
+    file_name: str,
+    speed_rate: float,
+    od_flag: str | float | None,
+    cvt_flag: list[str],
+    mod_display: str,
+    cache_dir: Path,
+) -> dict[str, Any]:
+    target_file = chart_file
+    target_name = file_name
+
+    if is_mc_file(str(target_file)):
+        osu_file_path = convert_mc_to_osu(str(target_file), str(cache_dir))
+        target_file = Path(osu_file_path)
+        target_name = os.path.basename(osu_file_path)
+
+    sr, ln_ratio, column_count = await get_rework_result(
+        str(target_file), speed_rate, od_flag, cvt_flag
+    )
+    pattern_result = await analyze_pattern_file(str(target_file), rate=speed_rate)
+    meta_data = resolve_meta_data(target_file, target_name)
+
+    merged_clusters = _merge_duplicate_clusters(pattern_result.report.Clusters)
+    top_five = merged_clusters[:5]
+    while len(top_five) < 5:
+        top_five.append({"label": "-", "amount": 0.0, "subtype": "-"})
+
+    max_amount = max((row["amount"] for row in top_five), default=1.0)
+    cluster_rows: list[dict[str, Any]] = []
+
+    for row in top_five:
+        width = 0.0 if max_amount <= 0 else (float(row["amount"]) / max_amount) * 100.0
+        cluster_rows.append(
+            {
+                "label": row["label"],
+                "width": f"{width:.2f}%",
+                "subtype": row["subtype"],
+            }
+        )
+
+    extra_parts = []
+    if speed_rate != 1.0:
+        speed_str = f"{speed_rate:.2f}".rstrip("0").rstrip(".")
+        extra_parts.append(f"x{speed_str}")
+    if isinstance(od_flag, (int, float)):
+        extra_parts.append(f"OD{od_flag}")
+
+    mod_line = mod_display
+    if extra_parts:
+        mod_line += f" ({', '.join(extra_parts)})"
+
+    diff_top, diff_bottom = _split_diff_lines(est_diff(sr, ln_ratio, column_count))
+    star_bg = _color_for(sr, STAR_BG_STOPS, "#6d7894")
+    star_text_pref = _color_for(sr, STAR_TEXT_STOPS, "#f6fbff")
+    star_text = _pick_readable_text_color(sr, star_bg, star_text_pref)
+
+    return {
+        "file_name": target_name,
+        "template": {
+            "status_text": _render_meta_title(meta_data),
+            "rework_star": f"{sr:.2f}",
+            "star_bg_color": star_bg,
+            "star_text_color": star_text,
+            "rework_meta_lines": [
+                f"LN%: {ln_ratio:.2%}",
+                f"Keys: {column_count}K",
+                f"Mods: {mod_line}",
+            ],
+            "rework_diff_top": diff_top,
+            "rework_diff_bottom": diff_bottom,
+            "clusters": cluster_rows,
+        },
+    }
+
+
+async def analyze_mapview_zip(
+    zip_file: Path,
+    speed_rate: float,
+    od_flag: str | float | None,
+    cvt_flag: list[str],
+    mod_display: str,
+    cache_dir: Path,
+) -> tuple[list[dict[str, Any]], list[str]]:
+    temp_dir = cache_dir / f"mapview_batch_{int(time.time())}_{os.getpid()}"
+    temp_dir.mkdir(parents=True, exist_ok=True)
+
+    results: list[dict[str, Any]] = []
+    errors: list[str] = []
+
+    try:
+        chart_files = extract_zip_file(zip_file, temp_dir)
+        for chart_file in chart_files:
+            try:
+                row = await analyze_mapview_chart(
+                    chart_file,
+                    chart_file.name,
+                    speed_rate,
+                    od_flag,
+                    cvt_flag,
+                    mod_display,
+                    cache_dir,
+                )
+                results.append(row)
+            except (ParseError, PatternParseError):
+                errors.append(f"{chart_file.name}: 谱面解析失败")
+            except (NotManiaError, PatternNotManiaError):
+                errors.append(f"{chart_file.name}: 该谱面不是 mania 模式")
+            except Exception as e:
+                errors.append(f"{chart_file.name}: 分析失败 - {e}")
+
+        return results, errors
+    finally:
+        if temp_dir.exists():
+            shutil.rmtree(temp_dir, ignore_errors=True)

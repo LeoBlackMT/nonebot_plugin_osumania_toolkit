@@ -1,3 +1,6 @@
+'''
+/rework 命令已重定向至 /mapview，本文件暂时保留以供参考，未来可能会删除。
+'''
 import os
 import logging
 

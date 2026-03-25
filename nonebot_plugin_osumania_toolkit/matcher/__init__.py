@@ -1,5 +1,5 @@
 from .pressingtime import pressingtime
-from .rework import rework
+# from .rework import rework
 from .omtk import omtk
 from .analyze import analyze
 from .delta import delta
@@ -9,9 +9,10 @@ from .scatter import scatter
 from .acc import acc
 from .percy import percy
 from .pattern import pattern
+from .mapview import mapview
 
 __all__ = ["pressingtime",
-           "rework",
+        #    "rework",
             "omtk",
             "analyze",
             "delta",
@@ -20,5 +21,6 @@ __all__ = ["pressingtime",
             "scatter",
             "acc",
             "percy",
-            "pattern"
+            "pattern",
+            "mapview"
            ]

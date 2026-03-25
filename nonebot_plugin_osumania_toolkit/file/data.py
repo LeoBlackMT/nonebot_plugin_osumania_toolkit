@@ -90,23 +90,21 @@ class omtk_help_data:
         ">osu!mania工具箱<\n"
         "发送/omtk显示此信息。发送/omtk <命令名> [页码]获取该命令的详细用法。\n\n"
         "可用命令：\n"
-        "1. /rework - 星数重算\n"
+        "1. /rework - 已重定向至/mapview\n"
         "2. /pressingtime 或 /按压 - 按键时间分析\n"
         "3. /analyze 或 /分析 - 作弊分析\n"
         "4. /delta 或 /偏差 - 判定偏差分析\n"
         "5. /lifebar 或 /血条 - 血条显示\n"
         "6. /spectrum 或 /频谱 - 频谱显示\n"
         "7. /scatter 或 /散点 - 散点图\n"
-        "8. /pattern 或 /键型 - 谱面键型分析\n"
+        "8. /pattern 或 /键型 - 谱面详细键型分析\n"
         "9. /percy 或 /投皮 - 投皮修改\n"
         "10. /acc 或 /单曲 - 单曲ACC计算\n"
+        "11. /mapview - 谱面键型分析与难度估计\n"
     )
     # help_text 结构: (命令, 命令名称, 页码, 总页码, 帮助文本)
-    help_text = [("rework", "星数重算", "1", "2",
-            "你可以回复包含 .osu/.mc 文件的消息，或回复包含 .osz/.mcz 的消息，或使用 bid 指定谱面。\n命令格式：/rework b<bid> +[mods] x[speed] OD[OD] \n示例：/rework b4094064 +EZHO x1.25\n/rework b4094064 +IN OD8\n警告：图包分析开销较大，请勿滥用。结果将发送大量文字，谨防刷屏。\n注意：1. 如果你回复了一个包含谱面/图包文件的消息，命令将忽略bid。\n2. 部分模组和参数冲突。"),
-            
-            ("rework", "星数重算", "2", "2",
-            "/rework参数说明：\n- bid: 以 b 开头，后跟整数，从官网获取谱面。或输入网址。\n- mods: 以 + 开头，后跟模组名缩写（支持 HR/EZ、DT/HT、IN/HO、DC/NC）。不区分大小写，格式如雨沐。\n- speed: 以 x 或 * 开头，后跟倍速数值（如 x1.5）。倍速必须在 0.25 到 3.0 之间。\n- OD: 以 OD 开头, OD值必须在 -15 到 15 之间。"),
+    help_text = [("rework", "星数重算", "1", "1",
+            "提示：/rework命令现已重定向至/mapview，后者统一提供键型分析和难度估计功能。\n请使用/mapview命令来分析谱面键型和估计难度，支持更多参数和模组。\n详情请输入/omtk mapview获取命令的使用说明。"),
             
             ("pressingtime", "按键时间", "1", "1", 
             "你可以使用/pressingtime (/按压) 命令的同时回复一个 .osr/.mr 文件以分析其按压时长分布图。\n注：作弊分析已移动至/analyze命令。"),
@@ -145,7 +143,13 @@ class omtk_help_data:
             "可用段位列表(*替换为具体的数字，$替换为版本号):\n1. Malody 4K Dan: 使用 *danv$ 或 ex*v$\n2. Malody 4K Extra Dan v2 (Sample): 使用 spex*\n3. osu!mania 4K Dan ~ REFORM (DDMythical): 使用 rf* 或 希腊字母(如alpha)\n备注: zeta和eta默认为Thaumiel，spz为Emik，额外支持haku(白段)\n4. osu!mania 4K LN Dan Courses v2: 使用 ln* \n5. xfpsb: 使用 xfpsb*, 其中*还可以是f \n6. wds0 Dan: 使用 wds0_* ,其中*还可以是j,n,f\n7. Senpai Dan v1: 使用 senpai* 或 senpaiex* \n8. osu!mania 7K Regular Dan Course: 使用 7k*dan 或 7k*, 其中后者包含s,g,z,a \n9. osu!mania 7K LN Dan Course: 使用 7kln*, 其中*还可以是s,g,z,a \n\n查看全部内置段位详情请发送: /omtk acc 3"),
             
             ("acc", "单曲ACC计算", "3", "3",
-            "全部内置段位列表:\n(正在加载...)")
+            "全部内置段位列表:\n(正在加载...)"),
+
+            ("mapview", "键型分析与难度估计", "1", "2",
+            "你可以回复包含 .osu/.mc 文件的消息，或回复包含 .osz/.mcz 的消息，或使用 bid/网址 指定谱面来分析键型和估计难度。\n命令格式：/mapview b<bid> +[mods] x[speed] OD[OD] \n示例：/mapview b4094064 +EZHO x1.25\n/mapview b4094064 +IN OD8\n警告：图包分析开销较大，请勿滥用。\n注意：1. 如果你回复了一个包含谱面/图包文件的消息，命令将忽略bid。\n2. 部分模组和参数冲突。"),
+            
+            ("mapview", "键型分析与难度估计", "2", "2",
+            "/mapview 参数说明：\n- bid: 以 b 开头，后跟整数，从官网获取谱面。或输入网址。\n- mods: 以 + 开头，后跟模组名缩写（支持 HR/EZ、DT/HT、IN/HO、DC/NC）。不区分大小写，格式如雨沐。\n- speed: 以 x 或 * 开头，后跟倍速数值（如 x1.5）。倍速必须在 0.25 到 3.0 之间。\n- OD: 以 OD 开头, OD值必须在 -15 到 15 之间。")
             ]
     command_aliases = {
         "按压": "pressingtime",
@@ -156,7 +160,7 @@ class omtk_help_data:
         "散点": "scatter",
         "键型": "pattern",
         "投皮": "percy",
-        "单曲": "acc"
+        "单曲": "acc",
         }
 
 # parser数据

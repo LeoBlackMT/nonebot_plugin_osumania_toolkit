@@ -54,24 +54,42 @@ def parse_bid_or_url(part: str) -> tuple[int | None, str | None]:
 
     return None, None
 
-async def send_forward_text_messages(bot: Bot, event: MessageEvent, texts: list[str], nickname: str = "Bot"):
-    """发送合并转发消息，适用于文本较多的情况"""
-    nodes = [
-        MessageSegment.node_custom(
-            user_id=int(bot.self_id),
-            nickname=nickname,
-            content=Message(text),
+async def send_forward_text_messages(
+    bot: Bot,
+    event: MessageEvent,
+    texts: list[Message | MessageSegment | str],
+    nickname: str = "Bot",
+):
+    """发送合并转发消息，支持纯文本或包含图片的消息节点。"""
+    nodes = []
+    for item in texts:
+        if isinstance(item, Message):
+            content = item
+        elif isinstance(item, MessageSegment):
+            content = Message(item)
+        else:
+            content = Message(str(item))
+
+        nodes.append(
+            MessageSegment.node_custom(
+                user_id=int(bot.self_id),
+                nickname=nickname,
+                content=content,
+            )
         )
-        for text in texts
-    ]
 
     if isinstance(event, GroupMessageEvent):
         await bot.call_api("send_group_forward_msg", group_id=event.group_id, messages=nodes)
     elif isinstance(event, PrivateMessageEvent):
         await bot.call_api("send_private_forward_msg", user_id=event.user_id, messages=nodes)
     else:
-        for text in texts:
-            await bot.send(text)
+        for item in texts:
+            if isinstance(item, Message):
+                await bot.send(item)
+            elif isinstance(item, MessageSegment):
+                await bot.send(Message(item))
+            else:
+                await bot.send(str(item))
 
 def match_notes_and_presses(osu: osu_file, osr: osr_file):
     """
