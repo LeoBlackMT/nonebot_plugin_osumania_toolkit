@@ -119,7 +119,10 @@ def assign_clusters(patterns: List[FoundPattern]) -> List[Tuple[FoundPattern, _C
     return patterns_with_clusters
 
 
-def specific_clusters(patterns_with_clusters: List[Tuple[FoundPattern, _ClusterBuilder]]) -> List[Cluster]:
+def specific_clusters(
+    patterns_with_clusters: List[Tuple[FoundPattern, _ClusterBuilder]],
+    mode_tag: str = "Mix",
+) -> List[Cluster]:
     groups: Dict[Tuple[CorePattern, bool, int], List[Tuple[FoundPattern, _ClusterBuilder]]] = {}
     for p, c in patterns_with_clusters:
         key = (p.Pattern, p.Mixed, c.Value)
@@ -142,16 +145,22 @@ def specific_clusters(patterns_with_clusters: List[Tuple[FoundPattern, _ClusterB
             Cluster(
                 Pattern=pattern,
                 SpecificTypes=specific_types,
-                RatingMultiplier=resolve_rating_multiplier(pattern, dominant_specific),
+                RatingMultiplier=resolve_rating_multiplier(pattern, dominant_specific, mode_tag),
                 BPM=bpm,
                 Mixed=mixed,
                 Amount=_pattern_amount(starts_ends) if len(starts_ends) > 0 else 0.0,
             )
         )
 
+    has_dw = any(c.Pattern in {CorePattern.Density, CorePattern.Wildcard} for c in out)
+    if has_dw and config.RELEASE_WITH_DW_MULTIPLIER != 1.0:
+        for c in out:
+            if any(name == "Release" and ratio > 0.0 for name, ratio in c.SpecificTypes):
+                c.RatingMultiplier *= config.RELEASE_WITH_DW_MULTIPLIER
+
     return out
 
 
-def calculate_clustered_patterns(patterns: List[FoundPattern]) -> List[Cluster]:
+def calculate_clustered_patterns(patterns: List[FoundPattern], mode_tag: str = "Mix") -> List[Cluster]:
     pwc = assign_clusters(patterns)
-    return specific_clusters(pwc)
+    return specific_clusters(pwc, mode_tag)

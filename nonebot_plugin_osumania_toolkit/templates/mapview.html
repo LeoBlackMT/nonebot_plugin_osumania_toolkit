@@ -59,7 +59,8 @@
         .status-row {
             display: flex;
             align-items: center;
-            gap: 0;
+            justify-content: space-between;
+            gap: 8px;
             margin-bottom: 8px;
             min-width: 0;
         }
@@ -75,6 +76,48 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+        }
+
+        .mode-tag {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 22px;
+            padding: 0 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            border: 1px solid rgba(255, 255, 255, 0.28);
+            color: #f5f7ff;
+            background: rgba(255, 255, 255, 0.12);
+            flex: 0 0 auto;
+            margin-left: auto;
+        }
+
+        .mode-tag.mode-rc {
+            background: rgba(94, 170, 255, 0.24);
+            border-color: rgba(94, 170, 255, 0.5);
+            color: #d8ecff;
+        }
+
+        .mode-tag.mode-ln {
+            background: rgba(86, 214, 179, 0.22);
+            border-color: rgba(86, 214, 179, 0.5);
+            color: #dcfff5;
+        }
+
+        .mode-tag.mode-hb {
+            background: rgba(255, 190, 110, 0.24);
+            border-color: rgba(255, 190, 110, 0.5);
+            color: #fff1d7;
+        }
+
+        .mode-tag.mode-mix {
+            background: rgba(190, 163, 255, 0.24);
+            border-color: rgba(190, 163, 255, 0.5);
+            color: #f0e8ff;
         }
 
         .main-card {
@@ -298,6 +341,7 @@
         <section class="card main-card">
             <div class="status-row">
                 <p id="status" class="status">{{ status_text }}</p>
+                <span class="mode-tag {{ mode_tag_class | default('mode-mix') }}">{{ mode_tag | default('Mix') }}</span>
             </div>
 
             <div class="star-block" id="rework">

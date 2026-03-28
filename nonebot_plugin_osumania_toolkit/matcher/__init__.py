@@ -10,6 +10,7 @@ from .acc import acc
 from .percy import percy
 from .pattern import pattern
 from .mapview import mapview
+from .ett import ett
 
 __all__ = ["pressingtime",
         #    "rework",
@@ -22,5 +23,6 @@ __all__ = ["pressingtime",
             "acc",
             "percy",
             "pattern",
-            "mapview"
+            "mapview",
+            "ett"
            ]

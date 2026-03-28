@@ -101,6 +101,7 @@ class omtk_help_data:
         "9. /percy 或 /投皮 - 投皮修改\n"
         "10. /acc 或 /单曲 - 单曲ACC计算\n"
         "11. /mapview - 谱面键型分析与难度估计\n"
+        "12. /ett - 将谱面按Etterna方式计算难度"
     )
     # help_text 结构: (命令, 命令名称, 页码, 总页码, 帮助文本)
     help_text = [("rework", "星数重算", "1", "1",
@@ -149,7 +150,10 @@ class omtk_help_data:
             "你可以回复包含 .osu/.mc 文件的消息，或回复包含 .osz/.mcz 的消息，或使用 bid/网址 指定谱面来分析键型和估计难度。\n命令格式：/mapview b<bid> +[mods] x[speed] OD[OD] \n示例：/mapview b4094064 +EZHO x1.25\n/mapview b4094064 +IN OD8\n警告：图包分析开销较大，请勿滥用。\n注意：1. 如果你回复了一个包含谱面/图包文件的消息，命令将忽略bid。\n2. 部分模组和参数冲突。"),
             
             ("mapview", "键型分析与难度估计", "2", "2",
-            "/mapview 参数说明：\n- bid: 以 b 开头，后跟整数，从官网获取谱面。或输入网址。\n- mods: 以 + 开头，后跟模组名缩写（支持 HR/EZ、DT/HT、IN/HO、DC/NC）。不区分大小写，格式如雨沐。\n- speed: 以 x 或 * 开头，后跟倍速数值（如 x1.5）。倍速必须在 0.25 到 3.0 之间。\n- OD: 以 OD 开头, OD值必须在 -15 到 15 之间。")
+            "/mapview 参数说明：\n- bid: 以 b 开头，后跟整数，从官网获取谱面。或输入网址。\n- mods: 以 + 开头，后跟模组名缩写（支持 HR/EZ、DT/HT、IN/HO、DC/NC）。不区分大小写，格式如雨沐。\n- speed: 以 x 或 * 开头，后跟倍速数值（如 x1.5）。倍速必须在 0.25 到 3.0 之间。\n- OD: 以 OD 开头, OD值必须在 -15 到 15 之间。"),
+            
+            ("ett", "Etterna难度计算", "1", "1",
+             "你可以回复包含 .osu/.mc 文件的消息，或回复包含 .osz/.mcz 的消息，或使用 bid/网址 指定谱面来将谱面按 Etterna 方式计算难度。\n命令格式：/ett b<bid> x[speed]\n示例：/ett b4094064 x1.25\n警告：图包分析开销较大，请勿滥用。\n注意：1. 如果你回复了一个包含谱面/图包文件的消息，命令将忽略bid。\n2. 该命令仅支持 rate（如 x1.5），不支持 mods、OD 覆写和 IN/HO。")
             ]
     command_aliases = {
         "按压": "pressingtime",

@@ -9,7 +9,12 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import List, Tuple
 
+from nonebot import get_plugin_config
+
+from ...config import Config
 from .chart import Chart, NoteType
+
+config = get_plugin_config(Config)
 
 
 class Direction(Enum):
@@ -196,17 +201,41 @@ def ln_percent(chart: Chart) -> float:
 
 
 def sv_time(chart: Chart) -> float:
-    # 对应 Metrics.sv_time：统计 SV != 1 的时间段
+    # 对应 Metrics.sv_time：统计有效 SV 变化时间段
     if len(chart.SV) == 0:
         return 0.0
     total = 0.0
     time = chart.FirstNote
     vel = 1.0
     for sv in chart.SV:
-        if (not (vel == vel)) or abs(vel - 1.0) > 0.01:
+        if (not (vel == vel)) or abs(vel - 1.0) > config.SV_SPEED_EPS:
             total += (sv.Time - time)
         vel = sv.Data
         time = sv.Time
-    if (not (vel == vel)) or abs(vel - 1.0) > 0.01:
+    if (not (vel == vel)) or abs(vel - 1.0) > config.SV_SPEED_EPS:
         total += (chart.LastNote - time)
+
+    # 极端 BPM 变化：即便 SV 时间较短也视作 SV
+    extreme = False
+    bpms = chart.BPM
+    if len(bpms) >= 1:
+        prev_mspb = None
+        for item in bpms:
+            mspb = float(item.Data.MsPerBeat)
+            if mspb <= 0:
+                extreme = True
+                break
+            bpm = 60000.0 / mspb
+            if bpm <= config.SV_EXTREME_BPM_MIN or bpm >= config.SV_EXTREME_BPM_MAX:
+                extreme = True
+                break
+            if prev_mspb is not None:
+                ratio = max(prev_mspb / mspb, mspb / prev_mspb)
+                if ratio >= config.SV_EXTREME_BPM_RATIO:
+                    extreme = True
+                    break
+            prev_mspb = mspb
+
+    if extreme:
+        return max(total, config.SV_AMOUNT_THRESHOLD + 1.0)
     return total

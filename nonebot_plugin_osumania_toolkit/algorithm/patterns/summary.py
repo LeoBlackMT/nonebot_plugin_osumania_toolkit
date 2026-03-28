@@ -16,6 +16,7 @@ from .clustering import Cluster, calculate_clustered_patterns
 from .patterns_def import CorePattern
 from .primitives import ln_percent, sv_time
 from .categorise import categorise_chart
+from .chart import NoteType
 
 config = get_plugin_config(Config)
 
@@ -25,6 +26,8 @@ class PatternReport:
     Clusters: List[Cluster]
     Category: str
     LNPercent: float
+    HBRowRatio: float
+    ModeTag: str
     SVAmount: float
 
     Duration: float
@@ -43,10 +46,49 @@ class PatternReport:
         return out
 
 
-def from_chart(chart) -> PatternReport:
-    patterns = find(chart)
+LN_CORE_PATTERNS = {
+    CorePattern.Coordination,
+    CorePattern.Density,
+    CorePattern.Wildcard,
+}
 
-    clusters = [c for c in calculate_clustered_patterns(patterns) if c.BPM > 25 or c.BPM == 0]
+
+def _hb_row_ratio(chart) -> float:
+    rows = chart.Notes if chart and chart.Notes else []
+    if len(rows) == 0:
+        return 0.0
+
+    hb_rows = 0
+    for row in rows:
+        data = list(row.Data) if row and row.Data else []
+        has_head = any(n == NoteType.HOLDHEAD for n in data)
+        has_normal = any(n == NoteType.NORMAL for n in data)
+        if has_head and has_normal:
+            hb_rows += 1
+
+    return hb_rows / float(len(rows))
+
+
+def _resolve_mode_tag(ln_ratio: float, hb_ratio: float) -> str:
+    if ln_ratio <= config.LN_MODE_LOW_THRESHOLD:
+        return "RC"
+    if ln_ratio >= config.LN_MODE_HIGH_THRESHOLD:
+        return "LN"
+    if hb_ratio >= config.HB_ROW_RATIO_THRESHOLD:
+        return "HB"
+    return "Mix"
+
+
+def from_chart(chart) -> PatternReport:
+    ln_ratio = ln_percent(chart)
+    hb_ratio = _hb_row_ratio(chart)
+    mode_tag = _resolve_mode_tag(ln_ratio, hb_ratio)
+
+    patterns = find(chart)
+    if mode_tag == "RC":
+        patterns = [p for p in patterns if p.Pattern not in LN_CORE_PATTERNS]
+
+    clusters = [c for c in calculate_clustered_patterns(patterns, mode_tag) if c.BPM > 25 or c.BPM == 0]
     clusters.sort(key=lambda x: x.Amount, reverse=True)
 
     def can_be_pruned(cluster: Cluster) -> bool:
@@ -67,7 +109,9 @@ def from_chart(chart) -> PatternReport:
 
     return PatternReport(
         Clusters=pruned_clusters,
-        LNPercent=ln_percent(chart),
+        LNPercent=ln_ratio,
+        HBRowRatio=hb_ratio,
+        ModeTag=mode_tag,
         SVAmount=sv_amount,
         Category=categorise_chart(chart.Keys, pruned_clusters, sv_amount),
         Duration=(chart.LastNote - chart.FirstNote),

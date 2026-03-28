@@ -44,7 +44,7 @@ STAR_TEXT_STOPS = [
 async def render_analysis_card(TEMPLATE_DIR: Path, data: dict) -> bytes:
     image_bytes = await template_to_pic(
         template_path=TEMPLATE_DIR,
-        template_name="index.html",
+        template_name="mapview.html",
         templates=data,
         max_width=475,
         device_height=490,
@@ -117,6 +117,12 @@ def _pick_readable_text_color(star_value: float, bg_color: str, preferred_color:
     if isinstance(star_value, (int, float)) and star_value > 12:
         return "#6563de"
 
+    if isinstance(star_value, (int, float)) and 6.0 <= star_value <= 6.49:
+        return "#000000"
+
+    if isinstance(star_value, (int, float)) and 6.5 <= star_value <= 8.9:
+        return "#ffd966"
+
     preferred = preferred_color or "#f6fbff"
     if _contrast_ratio(bg_color, preferred) >= 4.5:
         return preferred
@@ -137,6 +143,11 @@ def _pick_readable_text_color(star_value: float, bg_color: str, preferred_color:
     if dark_ratio >= 4.5 or dark_ratio > light_ratio:
         return candidate_dark
     return candidate_light
+
+
+def _mode_tag_class(tag: str) -> str:
+    normalized = tag if tag in {"RC", "LN", "HB", "Mix"} else "Mix"
+    return f"mode-{normalized.lower()}"
 
 
 def _merge_duplicate_clusters(clusters: list[Any]) -> list[dict[str, Any]]:
@@ -174,8 +185,6 @@ def _merge_duplicate_clusters(clusters: list[Any]) -> list[dict[str, Any]]:
                 "subtype": _specific_types_text(normalized) or "-",
             }
         )
-
-    out.sort(key=lambda x: x["amount"], reverse=True)
     return out
 
 
@@ -263,6 +272,8 @@ async def analyze_mapview_chart(
         "file_name": target_name,
         "template": {
             "status_text": _render_meta_title(meta_data),
+            "mode_tag": pattern_result.report.ModeTag,
+            "mode_tag_class": _mode_tag_class(pattern_result.report.ModeTag),
             "rework_star": f"{sr:.2f}",
             "star_bg_color": star_bg,
             "star_text_color": star_text,

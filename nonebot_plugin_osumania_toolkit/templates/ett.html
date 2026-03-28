@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>ETT Analysis</title>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --text-primary: #f5f7ff;
+            --text-soft: #a9b1d2;
+            --glass: #151b2f;
+            --glass-border: #2a3456;
+            --track: #2a3557;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            color: var(--text-primary);
+            font-family: "Outfit", "Segoe UI", sans-serif;
+            background: #0f1424;
+        }
+
+        .dashboard {
+            width: 475px;
+            min-width: 475px;
+            max-width: 475px;
+            margin: 0;
+        }
+
+        .card {
+            position: relative;
+            border-radius: 16px;
+            border: 1px solid var(--glass-border);
+            background: var(--glass);
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.24);
+            padding: 12px;
+            overflow: hidden;
+        }
+
+        .main-card {
+            display: grid;
+            grid-template-rows: auto auto minmax(0, 1fr) auto;
+            gap: 8px;
+            width: 475px;
+            height: 520px;
+            min-height: 520px;
+            max-height: 520px;
+        }
+
+        .status-row {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            min-width: 0;
+        }
+
+        .status {
+            font-size: 15px;
+            color: var(--text-soft);
+            width: 0;
+            flex: 1 1 0;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .mode-tag {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 22px;
+            padding: 0 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            border: 1px solid rgba(255, 255, 255, 0.28);
+            color: #f5f7ff;
+            background: rgba(255, 255, 255, 0.12);
+            position: absolute;
+            right: 12px;
+            bottom: 10px;
+            z-index: 2;
+        }
+
+        .mode-tag.mode-rc {
+            background: rgba(94, 170, 255, 0.24);
+            border-color: rgba(94, 170, 255, 0.5);
+            color: #d8ecff;
+        }
+
+        .mode-tag.mode-ln {
+            background: rgba(86, 214, 179, 0.22);
+            border-color: rgba(86, 214, 179, 0.5);
+            color: #dcfff5;
+        }
+
+        .mode-tag.mode-hb {
+            background: rgba(255, 190, 110, 0.24);
+            border-color: rgba(255, 190, 110, 0.5);
+            color: #fff1d7;
+        }
+
+        .mode-tag.mode-mix {
+            background: rgba(190, 163, 255, 0.24);
+            border-color: rgba(190, 163, 255, 0.5);
+            color: #f0e8ff;
+        }
+
+        .overall-block {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .overall-meta {
+            min-width: 0;
+            flex: 1 1 auto;
+            display: grid;
+            gap: 4px;
+        }
+
+        .overall-right {
+            text-align: right;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            align-items: flex-end;
+            justify-content: flex-end;
+            min-width: 0;
+            flex: 0 0 auto;
+            margin-left: auto;
+        }
+
+        .overall-value {
+            font-family: "Space Grotesk", "Segoe UI", sans-serif;
+            font-size: 42px;
+            font-weight: 800;
+            line-height: 1;
+            color: var(--overall-text-color, #f6fbff);
+            background: var(--overall-bg-color, #2b4f8f);
+            border: 1px solid #3a466f;
+            border-radius: 20px;
+            display: block;
+            min-height: 54px;
+            width: 176px;
+            max-width: 100%;
+            padding: 4px 12px 4px 10px;
+            white-space: nowrap;
+        }
+
+        .overall-number {
+            display: block;
+            width: 100%;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .overall-caption {
+            font-size: 12px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #bfc8e7;
+            opacity: 0.9;
+            text-align: right;
+            flex: 1;
+        }
+
+        .meta-lines {
+            font-size: 14px;
+            color: #d4dbf8;
+            line-height: 1.4;
+            opacity: 0.95;
+        }
+
+        .meta-line {
+            display: block;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .skill-bars {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 6px;
+            width: 100%;
+            height: 70%;
+            min-height: 0;
+            padding-right: 4px;
+            padding-bottom: 16px;
+            overflow-x: hidden;
+            overflow-y: hidden;
+        }
+
+        .skill-item {
+            display: grid;
+            gap: 3px;
+        }
+
+        .skill-label {
+            font-family: "Space Grotesk", "Segoe UI", sans-serif;
+            font-weight: 600;
+            font-size: 15px;
+            letter-spacing: 0.01em;
+            color: #e9efff;
+        }
+
+        .skill-track {
+            position: relative;
+            width: 100%;
+            height: 15px;
+            overflow: visible;
+        }
+
+        .skill-track-inner {
+            width: 100%;
+            height: 100%;
+            border-radius: 999px;
+            background: var(--track);
+            overflow: hidden;
+        }
+
+        .skill-fill {
+            width: var(--bar-width, 0%);
+            height: 100%;
+            border-radius: 0 999px 999px 0;
+            background: linear-gradient(90deg, #52caff 0%, #5ef0df 55%, #f6ef6b 100%);
+        }
+
+        .footer-note {
+            position: absolute;
+            left: 12px;
+            right: auto;
+            bottom: 10px;
+            font-size: 12px;
+            color: #bfc8e7;
+            opacity: 0.9;
+            line-height: 1.2;
+            pointer-events: none;
+        }
+    </style>
+</head>
+
+<body>
+    <main class="dashboard">
+        <section class="card main-card">
+            <div class="status-row">
+                <div class="status">{{ status_text }}</div>
+            </div>
+
+            <div class="overall-block">
+                <div class="overall-meta">
+                    <div class="meta-lines">
+                        {% if ett_meta_lines %}
+                        {% for line in ett_meta_lines %}
+                        <div class="meta-line">{{ line }}</div>
+                        {% endfor %}
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="overall-right">
+                    <div class="overall-value" style="--overall-bg-color: {{ overall_bg_color }}; --overall-text-color: {{ overall_text_color }};">
+                        <span class="overall-number">{{ overall_value }}</span>
+                    </div>
+                    <div class="overall-caption">MSD</div>
+                </div>
+            </div>
+
+            <ol class="skill-bars">
+                {% if skillsets %}
+                {% for item in skillsets %}
+                <li class="skill-item">
+                    <div class="skill-label">{{ item.label + ": " + item.value_text }}</div>
+                    <div class="skill-track">
+                        <div class="skill-track-inner">
+                            <div class="skill-fill" style="--bar-width: {{ item.width }};"></div>
+                        </div>
+                    </div>
+                </li>
+                {% endfor %}
+                {% endif %}
+            </ol>
+
+            <div class="footer-note">Generated by nonebot_plugin_osumania_toolkit</div>
+            <span class="mode-tag {{ mode_tag_class | default('mode-mix') }}">{{ mode_tag | default('Mix') }}</span>
+        </section>
+    </main>
+</body>
+
+</html>

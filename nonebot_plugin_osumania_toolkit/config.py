@@ -209,27 +209,169 @@ class Config(BaseModel):
         }
     )
 
-    # 子类倍率覆盖。若子类不在该表中，会回退到对应 CorePattern 的倍率。
-    SUBTYPE_RATING_MULTIPLIER: dict[str, float] = Field(
+    # 按模式标签分别配置子类倍率。
+    # 支持四个标签：RC / LN / HB / Mix。
+    # 每个标签都可分别配置 RC 键型子类与 LN 键型子类倍率。
+    SUBTYPE_RATING_MULTIPLIER_BY_MODE: dict[str, dict[str, float]] = Field(
         default_factory=lambda: {
-            # Coordination
-            "Column Lock": 1.5,
-            "Release": 0.73,
-            "Shield": 0.8,
-
-            # Density
-            "JS Density": 1.0,
-            "HS Density": 1.0,
-            "DS Density": 1.0,
-            "LCS Density": 1.0,
-            "DCS Density": 1.0,
-            "Inverse": 1.5,
-
-            # Wildcard
-            "Jacky WC": 0.55,
-            "Speedy WC": 0.8,
+            "RC": {
+                # Stream
+                "Rolls": 1.0 / 3.0,
+                "Trills": 1.0 / 3.0,
+                "Minitrills": 1.0 / 3.0,
+                # Chordstream
+                "Handstream": 0.65,
+                "Split Trill": 0.65,
+                "Jumptrill": 0.65,
+                "Jumpstream": 0.65,
+                "Brackets": 0.65,
+                "Double Stream": 0.65,
+                "Dense Chordstream": 0.65,
+                "Light Chordstream": 0.65,
+                "Chord Rolls": 0.65,
+                # Jacks
+                "Longjacks": 0.9,
+                "Quadstream": 0.9,
+                "Gluts": 0.9,
+                "Chordjacks": 0.9,
+                "Minijacks": 0.9,
+                # LN core families in RC
+                "Column Lock": 1.5,
+                "Release": 0.73,
+                "Shield": 0.8,
+                "JS Density": 1.0,
+                "HS Density": 1.0,
+                "DS Density": 1.0,
+                "LCS Density": 1.0,
+                "DCS Density": 1.0,
+                "Inverse": 1.3,
+                "Jacky WC": 0.55,
+                "Speedy WC": 0.8,
+            },
+            "LN": {
+                # Stream
+                "Rolls": 1.0 / 3.0,
+                "Trills": 1.0 / 3.0,
+                "Minitrills": 1.0 / 3.0,
+                # Chordstream
+                "Handstream": 0.65,
+                "Split Trill": 0.65,
+                "Jumptrill": 0.65,
+                "Jumpstream": 0.65,
+                "Brackets": 0.65,
+                "Double Stream": 0.65,
+                "Dense Chordstream": 0.65,
+                "Light Chordstream": 0.65,
+                "Chord Rolls": 0.65,
+                # Jacks
+                "Longjacks": 0.9,
+                "Quadstream": 0.9,
+                "Gluts": 0.9,
+                "Chordjacks": 0.9,
+                "Minijacks": 0.9,
+                # Coordination
+                "Column Lock": 1.5,
+                "Release": 1.0,
+                "Shield": 0.8,
+                # Density
+                "JS Density": 0.9,
+                "HS Density": 0.9,
+                "DS Density": 0.9,
+                "LCS Density": 0.9,
+                "DCS Density": 0.9,
+                "Inverse": 1.5,
+                # Wildcard
+                "Jacky WC": 0.55,
+                "Speedy WC": 0.8,
+            },
+            "HB": {
+                # Stream
+                "Rolls": 1.0 / 3.0,
+                "Trills": 1.0 / 3.0,
+                "Minitrills": 1.0 / 3.0,
+                # Chordstream
+                "Handstream": 0.65,
+                "Split Trill": 0.65,
+                "Jumptrill": 0.65,
+                "Jumpstream": 0.65,
+                "Brackets": 0.65,
+                "Double Stream": 0.65,
+                "Dense Chordstream": 0.65,
+                "Light Chordstream": 0.65,
+                "Chord Rolls": 0.65,
+                # Jacks
+                "Longjacks": 0.9,
+                "Quadstream": 0.9,
+                "Gluts": 0.9,
+                "Chordjacks": 0.9,
+                "Minijacks": 0.9,
+                # Coordination
+                "Column Lock": 1.5,
+                "Release": 0.3,
+                "Shield": 0.8,
+                # Density
+                "JS Density": 0.9,
+                "HS Density": 0.9,
+                "DS Density": 0.9,
+                "LCS Density": 0.9,
+                "DCS Density": 0.9,
+                "Inverse": 0.0,
+                # Wildcard
+                "Jacky WC": 0.65,
+                "Speedy WC": 0.45,
+            },
+            "Mix": {
+                # Stream
+                "Rolls": 1.0 / 3.0,
+                "Trills": 1.0 / 3.0,
+                "Minitrills": 1.0 / 3.0,
+                # Chordstream
+                "Handstream": 0.65,
+                "Split Trill": 0.65,
+                "Jumptrill": 0.65,
+                "Jumpstream": 0.65,
+                "Brackets": 0.65,
+                "Double Stream": 0.65,
+                "Dense Chordstream": 0.65,
+                "Light Chordstream": 0.65,
+                "Chord Rolls": 0.65,
+                # Jacks
+                "Longjacks": 0.9,
+                "Quadstream": 0.9,
+                "Gluts": 0.9,
+                "Chordjacks": 0.9,
+                "Minijacks": 0.9,
+                # Coordination
+                "Column Lock": 1.5,
+                "Release": 0.3,
+                "Shield": 0.8,
+                # Density
+                "JS Density": 0.9,
+                "HS Density": 0.9,
+                "DS Density": 0.9,
+                "LCS Density": 0.9,
+                "DCS Density": 0.9,
+                "Inverse": 0.0,
+                # Wildcard
+                "Jacky WC": 0.45,
+                "Speedy WC": 0.45,
+            },
         }
     )
+
+    # LN 模式下 RC 核心类缩放系数。
+    RC_CORE_LN_SCALE: float = 0.3
+
+    # RC 模式下 LN 核心类（Coordination / Density / Wildcard）缩放系数。
+    RC_LN_CORE_SCALE: float = 0.0
+
+    # 当命中 Density 或 Wildcard 时，对 Release 施加额外倍率。
+    RELEASE_WITH_DW_MULTIPLIER: float = 0.8
+
+    # 模式判定阈值。
+    LN_MODE_LOW_THRESHOLD: float = 0.1
+    LN_MODE_HIGH_THRESHOLD: float = 0.9
+    HB_ROW_RATIO_THRESHOLD: float = 0.1
 
     # -----------------------------
     # 聚类/分类相关阈值
@@ -253,6 +395,13 @@ class Config(BaseModel):
 
     # SV 分类阈值（ms）。
     SV_AMOUNT_THRESHOLD: float = 2000.0
+    # SV 判定：有效速度变化阈值（|sv-1| > 该值）
+    SV_SPEED_EPS: float = 0.05
+    # SV 判定：极端 BPM 范围（bpm 过小/过大即认为 SV）
+    SV_EXTREME_BPM_MIN: float = 30.0
+    SV_EXTREME_BPM_MAX: float = 350.0
+    # SV 判定：相邻 BPM 倍率变化阈值（max/min）
+    SV_EXTREME_BPM_RATIO: float = 3.0
 
     # Cluster.Format 显示子类名称的最低占比。
     # 设为 0.0 表示只要有子类统计就显示第一名子类名；
@@ -304,7 +453,7 @@ class Config(BaseModel):
     SHIELD_MAX_BEAT_RATIO: float = 0.25
 
     # Inverse 判定：尾到头间隔一致性容忍（毫秒）。
-    INVERSE_GAP_TOLERANCE_MS: float = 30.0
+    INVERSE_GAP_TOLERANCE_MS: float = 5.0
 
     # Inverse 判定：窗口内 LN Body 最少覆盖列数。
     INVERSE_MIN_FILLED_LANES: int = 3

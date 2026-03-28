@@ -24,8 +24,9 @@ def is_hybrid_chart(primary: Cluster, secondary: Cluster | None) -> bool:
 
 
 def categorise_chart(keys: int, ordered_clusters: List[Cluster], sv_amount: float) -> str:
+    _ = sv_amount
     if len(ordered_clusters) == 0:
-        return "SV" if sv_amount >= config.SV_AMOUNT_THRESHOLD else "Uncategorised"
+        return "Uncategorised"
 
     # important_clusters：Importance / first > 0.5
     first_imp = ordered_clusters[0].Importance
@@ -42,9 +43,8 @@ def categorise_chart(keys: int, ordered_clusters: List[Cluster], sv_amount: floa
     is_hybrid = is_hybrid_chart(cluster_1, cluster_2)
 
     is_tech = cluster_1.Mixed
-    is_sv = sv_amount >= config.SV_AMOUNT_THRESHOLD
 
-    if len(cluster_1.SpecificTypes) > 0 and cluster_1.SpecificTypes[0][1] > 0:
+    if len(cluster_1.SpecificTypes) > 0 and cluster_1.SpecificTypes[0][1] > 0.05:
         name = cluster_1.SpecificTypes[0][0]
     elif len(cluster_1.SpecificTypes) >= 2 and cluster_1.SpecificTypes[0][0] == "Jumpstream" and cluster_1.SpecificTypes[1][0] == "Handstream":
         a1 = cluster_1.SpecificTypes[0][1]
@@ -53,4 +53,4 @@ def categorise_chart(keys: int, ordered_clusters: List[Cluster], sv_amount: floa
     else:
         name = cluster_1.Pattern.value
 
-    return f"{name}{' Hybrid' if is_hybrid else ''}{' Tech' if is_tech else ''}{' + SV' if is_sv else ''}"
+    return f"{name}{' Hybrid' if is_hybrid else ''}{' Tech' if is_tech else ''}"

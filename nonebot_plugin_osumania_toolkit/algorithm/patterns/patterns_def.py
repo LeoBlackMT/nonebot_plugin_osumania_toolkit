@@ -34,7 +34,9 @@ RELEASE_MIN_TAIL_ROWS = config.RELEASE_MIN_TAIL_ROWS
 RELEASE_ROLL_POINTS = config.RELEASE_ROLL_POINTS
 RELEASE_SCAN_ROWS = config.RELEASE_SCAN_ROWS
 SHIELD_MAX_BEAT_RATIO = config.SHIELD_MAX_BEAT_RATIO
-SUBTYPE_RATING_MULTIPLIER = config.SUBTYPE_RATING_MULTIPLIER
+SUBTYPE_RATING_MULTIPLIER_BY_MODE = config.SUBTYPE_RATING_MULTIPLIER_BY_MODE
+RC_CORE_LN_SCALE = config.RC_CORE_LN_SCALE
+RC_LN_CORE_SCALE = config.RC_LN_CORE_SCALE
 WILDCARD_SPECIFIC_ORDER = config.WILDCARD_SPECIFIC_ORDER
 
 
@@ -55,10 +57,25 @@ class CorePattern(Enum):
         return CORE_RATING_MULTIPLIER.get(self.value, 1.0)
 
 
-def resolve_rating_multiplier(pattern: CorePattern, specific_type: str | None) -> float:
-    if specific_type is None:
-        return pattern.RatingMultiplier
-    return SUBTYPE_RATING_MULTIPLIER.get(specific_type, pattern.RatingMultiplier)
+def resolve_rating_multiplier(pattern: CorePattern, specific_type: str | None, mode_tag: str = "Mix") -> float:
+    ln_core_patterns = {CorePattern.Coordination, CorePattern.Density, CorePattern.Wildcard}
+    rc_core_patterns = {CorePattern.Stream, CorePattern.Chordstream, CorePattern.Jacks}
+
+    default_multiplier = pattern.RatingMultiplier
+
+    subtype_map = SUBTYPE_RATING_MULTIPLIER_BY_MODE.get(mode_tag, SUBTYPE_RATING_MULTIPLIER_BY_MODE.get("Mix", {}))
+
+    value = default_multiplier if specific_type is None else subtype_map.get(specific_type, default_multiplier)
+
+    if mode_tag == "RC" and pattern in ln_core_patterns:
+        mix_map = SUBTYPE_RATING_MULTIPLIER_BY_MODE.get("Mix", {})
+        base = default_multiplier if specific_type is None else mix_map.get(specific_type, default_multiplier)
+        value = base * RC_LN_CORE_SCALE
+
+    if mode_tag == "LN" and pattern in rc_core_patterns:
+        value *= RC_CORE_LN_SCALE
+
+    return value
 
 PatternRecogniser = Callable[[List[RowInfo]], int]
 
