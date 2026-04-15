@@ -151,7 +151,7 @@ class omtk_help_data:
         ">osu!mania工具箱<\n"
         "发送/omtk显示此信息。发送/omtk <命令名> [页码]获取该命令的详细用法。\n\n"
         "可用命令：\n"
-        "1. /rework - 已重定向至/mapview\n"
+        "1. /mapview - 谱面键型分析与难度估计\n"
         "2. /pressingtime 或 /按压 - 按键时间分析\n"
         "3. /analyze 或 /分析 - 作弊分析\n"
         "4. /delta 或 /偏差 - 判定偏差分析\n"
@@ -161,9 +161,8 @@ class omtk_help_data:
         "8. /pattern 或 /键型 - 谱面详细键型分析\n"
         "9. /percy 或 /投皮 - 投皮修改\n"
         "10. /acc 或 /单曲 - 单曲ACC计算\n"
-        "11. /mapview - 谱面键型分析与难度估计\n"
-        "12. /ett - 将谱面按Etterna方式计算难度\n"
-        "13. /cvtscore 或 /转换 - 按目标规则重算回放成绩"
+        "11. /ett - 将谱面按Etterna方式计算难度\n"
+        "12. /cvtscore 或 /转换 - 按目标规则重算回放成绩"
     )
     # help_text 结构: (命令, 命令名称, 页码, 总页码, 帮助文本)
     help_text = [("rework", "星数重算", "1", "1",
@@ -194,7 +193,7 @@ class omtk_help_data:
             "你可以使用/scatter (/散点)回复包含 .osr/.mr 文件的消息的同时使用 bid (或输入网址)指定谱面，来显示打击位置的二维散点图。\n命令格式：/scatter [b<bid>]\n示例：/scatter b4094064（同时回复osr）\n"),
 
             ("pattern", "键型分析", "1", "1",
-            "你可以使用/pattern (/键型)分析谱面键型。当前只支持RC。\n用法1：回复一条包含 .osu/.mc/.osz/.mcz 文件的消息，然后发送 /pattern。\n用法2：直接使用谱面ID：/pattern b<bid>\n示例：/pattern b4094064\n说明：结果将以合并转发消息发送。"),
+            "你可以使用/pattern (/键型)分析谱面键型。当前只支持RC。\n用法1：回复一条包含 .osu/.mc/.osz/.mcz 文件的消息，然后发送 /pattern。\n用法2：直接使用谱面ID：/pattern b<bid>\n示例：/pattern b4094064\n说明：如果要获取详细结果，请在命令中添加-d或-detail，随后将以合并转发消息发送。"),
 
             ("percy", "投皮", "1", "1",
             "你可以使用/percy (/投皮)命令来查看或修改 LN 图片的投机取巧程度。\n用法：回复一条包含 .png 图片文件的消息，同时发送 /percy [d] [lazer|lzr]。（推荐用文件形式发送以避免被qq压缩）\n参数说明：\n1. d：目标投机取巧程度（整数）。不填写时仅识别并返回当前程度。\n2. lazer/lzr：按 Lazer 规则处理与显示（可选）。\n示例：/percy（仅识别当前程度）\n/percy 150（将投皮程度调整到 150px）\n/percy 225 lzr（按 Lazer 模式调整）\n注意:\n1. Lazer 模式会进行 -75px 修正（下限 0），同时将图片长度固定在32800px。\n2. 本程序暂不支持渐变颜色面身、非单一颜色或含有图案面身的皮肤。\n3. 请确保回复的图片文件为 .png 格式。\n\n如果你需要批处理等高级功能，请前往仓库LeoBlackMT/percy_skin_editor"),
@@ -237,7 +236,7 @@ class omtk_help_data:
              "   - 具体规则：Quaver/chill、Malody/A\n"
              "   - 模板参数支持：diff 4、diff4、diff=4、j7\n"
              "5. 交互流程：回放 -> 谱面 -> 目标 ruleset。\n"
-             "6. 大小写不敏感：上述所有参数均支持大小写混输（如 B4094064、Template/SC、J7）。"),
+             "6. 大小写不敏感：上述所有参数大小写均不敏感。"),
 
             ("cvtscore", "成绩转换", "3", "3",
              "全部可用模板和 ruleset：\n" + _build_cvtscore_ruleset_listing_text())

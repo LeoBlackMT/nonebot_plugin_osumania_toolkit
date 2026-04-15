@@ -1,5 +1,7 @@
+from pathlib import Path
+
 from nonebot import on_command
-from nonebot.adapters.onebot.v11 import Bot, Message, MessageEvent
+from nonebot.adapters.onebot.v11 import Bot, Message, MessageEvent, MessageSegment
 from nonebot.exception import FinishedException, RejectedException
 from nonebot.params import Arg
 from nonebot.typing import T_State
@@ -15,14 +17,32 @@ from ..algorithm.cvtscore import (
     prepare_cvtscore_state,
     run_cvtscore_conversion,
     update_cvtscore_state_from_text_input,
+    render_cvtscore_card,
 )
 from ..algorithm.utils import parse_bid_or_url
 
 
 CACHE_DIR = get_plugin_cache_dir()
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
+TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates"
 
 cvtscore = on_command("cvtscore", aliases={"转换"}, block=True)
+
+
+async def _finish_with_cvtscore_result(payload: dict | None):
+    payload = payload or {}
+    text = str(payload.get("text") or "转换完成。")
+    card_data = payload.get("card_data")
+
+    if isinstance(card_data, dict):
+        try:
+            image_bytes = await render_cvtscore_card(card_data, TEMPLATE_DIR)
+        except Exception:
+            pass
+        else:
+            await cvtscore.finish(MessageSegment.image(image_bytes))
+
+    await cvtscore.finish(text)
 
 
 @cvtscore.handle()
@@ -80,9 +100,7 @@ async def handle_cvtscore_first(bot: Bot, event: MessageEvent, state: T_State):
         if not ready:
             await cvtscore.send(prompt)
             return
-
-        await cvtscore.send("正在转换成绩，请稍候...")
-        text, err = await run_cvtscore_conversion(state)
+        payload, err = await run_cvtscore_conversion(state)
         if err:
             state["status"] = "Fail"
             await cleanup_cvtscore_state(state)
@@ -90,7 +108,7 @@ async def handle_cvtscore_first(bot: Bot, event: MessageEvent, state: T_State):
 
         state["status"] = "Finish"
         await cleanup_cvtscore_state(state)
-        await cvtscore.finish(text)
+        await _finish_with_cvtscore_result(payload)
 
     except FinishedException:
         raise
@@ -186,7 +204,7 @@ async def handle_cvtscore_interactive(bot: Bot, state: T_State, user_input: Mess
             await cvtscore.reject(prompt)
 
         await cvtscore.send("信息已齐全，正在转换成绩，请稍候...")
-        text, err = await run_cvtscore_conversion(state)
+        payload, err = await run_cvtscore_conversion(state)
         if err:
             state["status"] = "Fail"
             await cleanup_cvtscore_state(state)
@@ -194,7 +212,7 @@ async def handle_cvtscore_interactive(bot: Bot, state: T_State, user_input: Mess
 
         state["status"] = "Finish"
         await cleanup_cvtscore_state(state)
-        await cvtscore.finish(text)
+        await _finish_with_cvtscore_result(payload)
 
     except FinishedException:
         raise

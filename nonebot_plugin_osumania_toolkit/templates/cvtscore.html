@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Score Convert</title>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --text-primary: #f5f7ff;
+            --text-soft: #a9b1d2;
+            --glass: #151b2f;
+            --glass-border: #2a3456;
+            --track: #2a3557;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            color: var(--text-primary);
+            font-family: "Outfit", "Segoe UI", sans-serif;
+            background: #0f1424;
+        }
+
+        .dashboard {
+            width: 475px;
+            min-width: 475px;
+            max-width: 475px;
+            margin: 0;
+        }
+
+        .card {
+            position: relative;
+            border-radius: 16px;
+            border: 1px solid var(--glass-border);
+            background: var(--glass);
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.24);
+            padding: 12px;
+            overflow: hidden;
+        }
+
+        .main-card {
+            display: grid;
+            grid-template-rows: auto auto minmax(0, 1fr);
+            gap: 8px;
+            width: 475px;
+            height: {{ card_height | default(500) }}px;
+            min-height: {{ card_height | default(500) }}px;
+            max-height: {{ card_height | default(500) }}px;
+        }
+
+        .status-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .status {
+            font-size: 15px;
+            color: var(--text-soft);
+            width: 0;
+            flex: 1 1 0;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .mode-tag {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 22px;
+            padding: 0 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            border: 1px solid rgba(255, 255, 255, 0.28);
+            color: #f5f7ff;
+            background: rgba(255, 255, 255, 0.12);
+            flex: 0 0 auto;
+        }
+
+        .flow {
+            display: grid;
+            gap: 6px;
+            min-width: 0;
+        }
+
+        .flow-title {
+            font-family: "Space Grotesk", "Segoe UI", sans-serif;
+            font-size: 26px;
+            font-weight: 800;
+            line-height: 1.05;
+            color: #f6fbff;
+        }
+
+        .flow-route {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #d4dbf8;
+            min-width: 0;
+        }
+
+        .route-item {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .route-arrow {
+            font-family: "Space Grotesk", "Segoe UI", sans-serif;
+            font-size: 18px;
+            color: #9fd6ff;
+        }
+
+        .sections {
+            min-height: 0;
+            padding-bottom: 24px;
+        }
+
+        .score-section {
+            padding: 8px;
+            display: grid;
+            grid-template-rows: auto auto minmax(0, 1fr) auto;
+            gap: 6px;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .section-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 6px;
+            min-width: 0;
+        }
+
+        .section-title {
+            font-family: "Space Grotesk", "Segoe UI", sans-serif;
+            font-size: 15px;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .badge-row {
+            display: grid;
+            gap: 6px;
+            align-items: center;
+            flex: 0 0 auto;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 40px;
+            height: 22px;
+            border-radius: 999px;
+            padding: 0 8px;
+            font-family: "Space Grotesk", "Segoe UI", sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            border: 1px solid var(--badge-border, rgba(255, 255, 255, 0.35));
+            background: var(--badge-bg, rgba(255, 255, 255, 0.16));
+            color: var(--badge-text, #f5f7ff);
+        }
+
+        .metrics {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            font-size: 13px;
+            color: #d4dbf8;
+        }
+
+        .judgement-bars {
+            list-style: none;
+            display: grid;
+            gap: 18px;
+            align-content: start;
+            min-height: 0;
+            overflow: hidden;
+            padding-right: 2px;
+        }
+
+        .judge-bar-item {
+            display: grid;
+            gap: 8px;
+        }
+
+        .judge-bar-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .judge-bar-name {
+            font-size: 12px;
+            color: #dbe5ff;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+        }
+
+        .judge-count-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 32px;
+            height: 18px;
+            padding: 0 7px;
+            color: #ffffff;
+            font-family: "Space Grotesk", "Segoe UI", sans-serif;
+            font-size: 11px;
+            font-weight: 700;
+            flex: 0 0 auto;
+        }
+
+        .judge-bar-track {
+            width: 100%;
+            height: 10px;
+            border-radius: 999px;
+            background: var(--bar-track, rgba(75, 90, 128, 0.34));
+            overflow: hidden;
+        }
+
+        .judge-bar-fill {
+            width: var(--bar-width, 0%);
+            height: 100%;
+            border-radius: 0 999px 999px 0;
+            background: var(--bar-fill, rgba(85, 200, 255, 0.82));
+        }
+
+        .judgement-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-content: flex-start;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .judge-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 999px;
+            border: 1px solid var(--chip-border, rgba(255, 255, 255, 0.28));
+            background: var(--chip-bg, rgba(255, 255, 255, 0.14));
+            color: var(--chip-text, #f5f7ff);
+            height: 22px;
+            padding: 0 8px;
+            max-width: 100%;
+        }
+
+        .judge-swatch {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--swatch, rgba(255, 255, 255, 0.8));
+            box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.28);
+            flex: 0 0 auto;
+        }
+
+        .judge-name {
+            font-size: 12px;
+            max-width: 110px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .judge-count {
+            font-family: "Space Grotesk", "Segoe UI", sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            flex: 0 0 auto;
+        }
+
+        .warning {
+            font-size: 12px;
+            color: #ffd4d4;
+            line-height: 1.3;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .footer-note {
+            position: absolute;
+            left: 12px;
+            right: 12px;
+            bottom: 10px;
+            font-size: 12px;
+            color: #bfc8e7;
+            opacity: 0.9;
+            line-height: 1.2;
+            margin-top: 0;
+            pointer-events: none;
+        }
+    </style>
+</head>
+
+<body>
+    <main class="dashboard">
+        <section class="card main-card">
+            <div class="status-row">
+                <div class="status">{{ status_text }}</div>
+            </div>
+
+            <div class="flow">
+                <div class="flow-title">Score Conversion</div>
+                <div class="flow-route">
+                    <div class="route-item">{{ source_display }}</div>
+                    <div class="route-arrow">↓↓↓</div>
+                    <div class="route-item">{{ target_display }}</div>
+                </div>
+            </div>
+
+            <div class="sections">
+                <section class="score-section">
+                    <div class="section-head">
+                        <div class="badge-row">
+                            {% if target.show_grade %}
+                            <span class="badge" style="--badge-bg: {{ target.grade_bg }}; --badge-border: {{ target.grade_border }}; --badge-text: {{ target.grade_text }};">{{ target.grade }}</span>
+                            {% endif %}
+                            {% if target.show_lamp %}
+                            <span class="badge" style="--badge-bg: {{ target.lamp_bg }}; --badge-border: {{ target.lamp_border }}; --badge-text: {{ target.lamp_text }};">{{ target.lamp }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="metrics">
+                        <span>Acc: {{ target.accuracy }}</span>
+                    </div>
+                    <div class="metrics">
+                        <span>MaxCombo: {{ target.combo }}</span>
+                    </div>
+                    {% if target.use_bar_chart %}
+                    <ol class="judgement-bars">
+                        {% if target.judgement_bars %}
+                        {% for item in target.judgement_bars %}
+                        <li class="judge-bar-item">
+                            <div class="judge-bar-head">
+                                <span class="judge-bar-name">{{ item.name }}</span>
+                                <span class="judge-count-pill" style="--pill-bg: {{ item.count_bg }}; --pill-border: {{ item.count_border }}; --pill-text: {{ item.count_text }};">{{ item.count }}</span>
+                            </div>
+                            <div class="judge-bar-track" style="--bar-track: {{ item.track }};">
+                                <div class="judge-bar-fill" style="--bar-width: {{ item.width }}; --bar-fill: {{ item.fill }};"></div>
+                            </div>
+                        </li>
+                        {% endfor %}
+                        {% endif %}
+                    </ol>
+                    {% else %}
+                    <div class="judgement-grid">
+                        {% if target.judgements %}
+                        {% for item in target.judgements %}
+                        <div class="judge-chip" style="--chip-bg: {{ item.bg }}; --chip-border: {{ item.border }}; --chip-text: {{ item.text }}; --swatch: {{ item.swatch }};">
+                            <span class="judge-swatch"></span>
+                            <span class="judge-name">{{ item.name }} :</span>
+                            <span class="judge-count">{{ item.count }}</span>
+                        </div>
+                        {% endfor %}
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% if target.warnings_text %}
+                    <div class="warning">{{ target.warnings_text }}</div>
+                    {% endif %}
+                </section>
+            </div>
+
+            <div class="footer-note">Generated by nonebot_plugin_osumania_toolkit</div>
+        </section>
+    </main>
+</body>
+
+</html>
