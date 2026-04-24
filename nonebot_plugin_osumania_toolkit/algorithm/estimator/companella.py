@@ -101,7 +101,7 @@ def _parse_prediction(raw_value: float) -> tuple[int, str]:
 
 
 def _extract_first_numeric_value(value: Any) -> float:
-    if isinstance(value, (int, float)):
+    if isinstance(value, (int, float, np.generic)):
         return float(value)
     if isinstance(value, np.ndarray):
         if value.size == 0:
