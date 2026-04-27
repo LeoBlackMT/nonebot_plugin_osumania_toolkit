@@ -208,11 +208,11 @@ def sv_time(chart: Chart) -> float:
     time = chart.FirstNote
     vel = 1.0
     for sv in chart.SV:
-        if (not (vel == vel)) or abs(vel - 1.0) > config.SV_SPEED_EPS:
+        if (not (vel == vel)) or abs(vel - 1.0) > config.sv_speed_eps:
             total += (sv.Time - time)
         vel = sv.Data
         time = sv.Time
-    if (not (vel == vel)) or abs(vel - 1.0) > config.SV_SPEED_EPS:
+    if (not (vel == vel)) or abs(vel - 1.0) > config.sv_speed_eps:
         total += (chart.LastNote - time)
 
     # 极端 BPM 变化：即便 SV 时间较短也视作 SV
@@ -226,16 +226,16 @@ def sv_time(chart: Chart) -> float:
                 extreme = True
                 break
             bpm = 60000.0 / mspb
-            if bpm <= config.SV_EXTREME_BPM_MIN or bpm >= config.SV_EXTREME_BPM_MAX:
+            if bpm <= config.sv_extreme_bpm_min or bpm >= config.sv_extreme_bpm_max:
                 extreme = True
                 break
             if prev_mspb is not None:
                 ratio = max(prev_mspb / mspb, mspb / prev_mspb)
-                if ratio >= config.SV_EXTREME_BPM_RATIO:
+                if ratio >= config.sv_extreme_bpm_ratio:
                     extreme = True
                     break
             prev_mspb = mspb
 
     if extreme:
-        return max(total, config.SV_AMOUNT_THRESHOLD + 1.0)
+        return max(total, config.sv_amount_threshold + 1.0)
     return total

@@ -1,21 +1,13 @@
 from __future__ import annotations
 
 
-class EstimatorError(Exception):
+class ParseError(RuntimeError):
     pass
 
 
-class ParseError(EstimatorError):
+class NotManiaError(RuntimeError):
     pass
 
 
-class NotManiaError(EstimatorError):
-    pass
-
-
-class UnsupportedKeyError(EstimatorError):
-    pass
-
-
-class ModelUnavailableError(EstimatorError):
+class UnsupportedKeyError(RuntimeError):
     pass

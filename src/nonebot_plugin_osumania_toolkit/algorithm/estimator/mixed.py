@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import re
 from typing import Any
 
 from .shared import normalize_cvt_flags
@@ -47,11 +48,8 @@ def compose_difficulty_from_rc_ln(rc_label: Any, ln_label: Any, ln_ratio: Any) -
 
 
 def is_daniel_too_low_difficulty(value: Any) -> bool:
-    try:
-        numeric = float(value)
-    except (TypeError, ValueError):
-        return True
-    return numeric < 1.0
+    text = str(value or "").strip()
+    return re.match(r"^<\s*alpha\b", text, flags=re.IGNORECASE) is not None
 
 
 def can_use_azusa_result(result: Any) -> bool:
@@ -62,8 +60,7 @@ def can_use_azusa_result(result: Any) -> bool:
     est_diff = str(result.get("estDiff", "")).strip()
     if not est_diff or est_diff.lower().startswith("invalid"):
         return False
-    numeric = result.get("numericDifficulty")
-    return isinstance(numeric, (int, float)) and math.isfinite(float(numeric))
+    return True
 
 
 def can_use_daniel_result(result: Any) -> bool:
@@ -71,10 +68,7 @@ def can_use_daniel_result(result: Any) -> bool:
         return False
     if int(result.get("columnCount", 0) or 0) != 4:
         return False
-    numeric = result.get("numericDifficulty")
-    if not isinstance(numeric, (int, float)) or not math.isfinite(float(numeric)):
-        return False
-    return not is_daniel_too_low_difficulty(numeric)
+    return not is_daniel_too_low_difficulty(result.get("estDiff"))
 
 
 def apply_companella_to_mixed_result(mixed_result: dict[str, Any], companella_result: dict[str, Any]) -> dict[str, Any]:
@@ -139,7 +133,7 @@ def estimate_mixed_result(
             try:
                 from .azusa import estimate_azusa_result
 
-                azusa_result = estimate_azusa_result(source, speed_rate, od_flag, cvt_flag, sunny_result=sunny)
+                azusa_result = estimate_azusa_result(source, speed_rate, od_flag, cvt_flag, sunny_result=sunny, force_sunny_reference_ho=False)
             except Exception:
                 azusa_result = None
 

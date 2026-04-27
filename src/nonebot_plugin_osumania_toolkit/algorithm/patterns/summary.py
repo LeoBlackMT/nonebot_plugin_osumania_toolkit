@@ -39,7 +39,7 @@ class PatternReport:
         importance = self.Clusters[0].Importance
         out = []
         for c in self.Clusters:
-            if c.Importance / importance > config.IMPORTANT_CLUSTER_RATIO:
+            if c.Importance / importance > config.important_cluster_ratio:
                 out.append(c)
             else:
                 break
@@ -70,11 +70,11 @@ def _hb_row_ratio(chart) -> float:
 
 
 def _resolve_mode_tag(ln_ratio: float, hb_ratio: float) -> str:
-    if ln_ratio <= config.LN_MODE_LOW_THRESHOLD:
+    if ln_ratio <= config.ln_mode_low_threshold:
         return "RC"
-    if ln_ratio >= config.LN_MODE_HIGH_THRESHOLD:
+    if ln_ratio >= config.ln_mode_high_threshold:
         return "LN"
-    if hb_ratio >= config.HB_ROW_RATIO_THRESHOLD:
+    if hb_ratio >= config.hb_row_ratio_threshold:
         return "HB"
     return "Mix"
 

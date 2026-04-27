@@ -10,6 +10,8 @@ require("nonebot_plugin_htmlkit")
 from nonebot_plugin_htmlkit import template_to_pic  # type: ignore[import-not-found]
 
 from .convert import convert_mc_to_osu
+from .estimator.companella import estimate_companella_result
+from .estimator.mixed import apply_companella_to_mixed_result
 from .estimator.mixed import estimate_mixed_result
 from .estimator.sunny import build_sunny_result
 from .patterns import PatternNotManiaError, PatternParseError, analyze_pattern_file
@@ -281,6 +283,7 @@ async def analyze_mapview_chart(
         raise ParseError(f"Rework 解析阶段失败: {detail}") from e
 
     sunny_result = build_sunny_result(sr, ln_ratio, column_count)
+    mixed_result: dict[str, Any] | None = None
 
     try:
         mixed_result = await asyncio.to_thread(
@@ -294,6 +297,20 @@ async def analyze_mapview_chart(
         mixed_diff_text = str(mixed_result.get("estDiff", sunny_result["estDiff"]))
     except Exception:
         mixed_diff_text = sunny_result["estDiff"]
+
+    if isinstance(mixed_result, dict) and mixed_result.get("mixedCompanellaPlan"):
+        try:
+            companella_result = await asyncio.to_thread(
+                estimate_companella_result,
+                str(target_file),
+                speed_rate,
+                cvt_flag,
+                sunny_result=sunny_result,
+            )
+            mixed_result = apply_companella_to_mixed_result(mixed_result, companella_result)
+            mixed_diff_text = str(mixed_result.get("estDiff", mixed_diff_text))
+        except Exception:
+            pass
 
     try:
         pattern_result = await analyze_pattern_file(str(target_file), rate=speed_rate)

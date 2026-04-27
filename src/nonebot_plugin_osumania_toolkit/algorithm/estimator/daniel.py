@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import math
 from typing import Any
 
 from .exceptions import UnsupportedKeyError
-from .rc import estimate_daniel_dan, estimate_daniel_numeric, numeric_to_rc_label
+from .rc import estimate_daniel_dan
 from .sunny import estimate_sunny_result
 
 
@@ -21,22 +20,17 @@ def estimate_daniel_result(
 
     column_count = int(sunny_result.get("columnCount", 0) or 0)
     if column_count != 4:
-        raise UnsupportedKeyError("Daniel fallback only applies to 4K maps in the mixed pipeline")
+        return sunny_result
 
-    daniel = estimate_daniel_dan(float(sunny_result.get("star", math.nan)))
-    numeric = estimate_daniel_numeric({"star": sunny_result.get("star")})
-    if numeric is None:
-        numeric = float(sunny_result.get("numericDifficulty") or 0.0)
-        est_diff = str(sunny_result.get("estDiff") or numeric_to_rc_label(float(numeric)))
-        hint = "N/A"
-    else:
-        est_diff = daniel["label"]
-        hint = None
+    daniel = estimate_daniel_dan(float(sunny_result.get("star", 0.0)))
+    numeric = daniel["numeric"]
+    est_diff = daniel["label"]
+    hint = "N/A" if numeric is None else None
 
     return {
         **sunny_result,
-        "numericDifficulty": round(float(numeric), 2),
+        "numericDifficulty": round(float(numeric), 2) if numeric is not None else None,
         "numericDifficultyHint": hint,
         "estDiff": est_diff,
-        "rawNumericDifficulty": round(float(numeric), 4),
+        "rawNumericDifficulty": round(float(numeric), 4) if numeric is not None else None,
     }

@@ -15,8 +15,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
-import os
-import math
 
 from .chart import Chart, BPM, NoteRow, NoteType, TimeItem
 from .time_types import Time

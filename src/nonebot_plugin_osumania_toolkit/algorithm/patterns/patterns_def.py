@@ -21,23 +21,23 @@ from .primitives import RowInfo, Direction, detect_direction
 
 config = get_plugin_config(Config)
 
-COORDINATION_SPECIFIC_ORDER = config.COORDINATION_SPECIFIC_ORDER
-CORE_RATING_MULTIPLIER = config.CORE_RATING_MULTIPLIER
-DENSITY_SPECIFIC_ORDER = config.DENSITY_SPECIFIC_ORDER
-INVERSE_GAP_TOLERANCE_MS = config.INVERSE_GAP_TOLERANCE_MS
-INVERSE_MIN_FILLED_LANES = config.INVERSE_MIN_FILLED_LANES
-JACKY_CONTEXT_WINDOW = config.JACKY_CONTEXT_WINDOW
-JACKY_FALLBACK_MAX_MSPB = config.JACKY_FALLBACK_MAX_MSPB
-JACKY_MIN_BPM = config.JACKY_MIN_BPM
-RELEASE_FULL_MATCH_ROWS = config.RELEASE_FULL_MATCH_ROWS
-RELEASE_MIN_TAIL_ROWS = config.RELEASE_MIN_TAIL_ROWS
-RELEASE_ROLL_POINTS = config.RELEASE_ROLL_POINTS
-RELEASE_SCAN_ROWS = config.RELEASE_SCAN_ROWS
-SHIELD_MAX_BEAT_RATIO = config.SHIELD_MAX_BEAT_RATIO
-SUBTYPE_RATING_MULTIPLIER_BY_MODE = config.SUBTYPE_RATING_MULTIPLIER_BY_MODE
-RC_CORE_LN_SCALE = config.RC_CORE_LN_SCALE
-RC_LN_CORE_SCALE = config.RC_LN_CORE_SCALE
-WILDCARD_SPECIFIC_ORDER = config.WILDCARD_SPECIFIC_ORDER
+COORDINATION_SPECIFIC_ORDER = config.coordination_specific_order
+CORE_RATING_MULTIPLIER = config.core_rating_multiplier
+DENSITY_SPECIFIC_ORDER = config.density_specific_order
+INVERSE_GAP_TOLERANCE_MS = config.inverse_gap_tolerance_ms
+INVERSE_MIN_FILLED_LANES = config.inverse_min_filled_lanes
+JACKY_CONTEXT_WINDOW = config.jacky_context_window
+JACKY_FALLBACK_MAX_MSPB = config.jacky_fallback_max_mspb
+JACKY_MIN_BPM = config.jacks_min_bpm
+RELEASE_FULL_MATCH_ROWS = config.release_full_match_rows
+RELEASE_MIN_TAIL_ROWS = config.release_min_tail_rows
+RELEASE_ROLL_POINTS = config.release_roll_points
+RELEASE_SCAN_ROWS = config.release_scan_rows
+SHIELD_MAX_BEAT_RATIO = config.shield_max_beat_ratio
+SUBTYPE_RATING_MULTIPLIER_BY_MODE = config.subtype_rating_multiplier_by_mode
+RC_CORE_LN_SCALE = config.rc_core_ln_scale
+RC_LN_CORE_SCALE = config.rc_ln_core_scale
+WILDCARD_SPECIFIC_ORDER = config.wildcard_specific_order
 
 
 # -----------------------------

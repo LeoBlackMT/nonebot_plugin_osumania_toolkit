@@ -73,7 +73,7 @@ def _append_found_pattern(
 ) -> None:
     d = remaining[:n2]
     mean_mspb = sum(x.MsPerBeat for x in d) / len(d)
-    mixed = not all(abs(x.MsPerBeat - mean_mspb) < config.PATTERN_STABILITY_THRESHOLD for x in d)
+    mixed = not all(abs(x.MsPerBeat - mean_mspb) < config.pattern_stability_threshold for x in d)
 
     start = remaining[0].Time
     if pattern == CorePattern.Jacks:
@@ -104,7 +104,7 @@ def _append_core_matches(
     if core_n == 0:
         return
 
-    if config.ENABLE_MULTI_LABEL_SAME_WINDOW:
+    if config.enable_multi_label_same_window:
         matched = _pick_specific_all(specific_list, remaining)
         if len(matched) == 0:
             _append_found_pattern(results, pattern, None, core_n, remaining, last_note)
@@ -126,7 +126,7 @@ def matches(specific_patterns: SpecificPatterns, last_note: float, primitives: L
     results: List[FoundPattern] = []
 
     while len(remaining) > 0:
-        # 流式（Stream）
+        # Stream
         _append_core_matches(
             results,
             CorePattern.Stream,
@@ -136,7 +136,7 @@ def matches(specific_patterns: SpecificPatterns, last_note: float, primitives: L
             last_note,
         )
 
-        # 和弦流（Chordstream）
+        # Chordstream
         _append_core_matches(
             results,
             CorePattern.Chordstream,
@@ -146,7 +146,7 @@ def matches(specific_patterns: SpecificPatterns, last_note: float, primitives: L
             last_note,
         )
 
-        # 连打（Jacks）
+        # Jacks
         _append_core_matches(
             results,
             CorePattern.Jacks,
@@ -156,7 +156,7 @@ def matches(specific_patterns: SpecificPatterns, last_note: float, primitives: L
             last_note,
         )
 
-        # 协调类（Coordination）
+        # Coordination
         _append_core_matches(
             results,
             CorePattern.Coordination,
@@ -166,7 +166,7 @@ def matches(specific_patterns: SpecificPatterns, last_note: float, primitives: L
             last_note,
         )
 
-        # 密度类（Density）
+        # Density
         _append_core_matches(
             results,
             CorePattern.Density,
@@ -176,7 +176,7 @@ def matches(specific_patterns: SpecificPatterns, last_note: float, primitives: L
             last_note,
         )
 
-        # 万能类（Wildcard）
+        # Wildcard
         _append_core_matches(
             results,
             CorePattern.Wildcard,

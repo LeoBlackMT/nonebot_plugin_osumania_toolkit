@@ -31,7 +31,7 @@ class Cluster:
         return self.Amount * self.RatingMultiplier * float(self.BPM)
 
     def Format(self, rate: float) -> str:
-        if len(self.SpecificTypes) > 0 and self.SpecificTypes[0][1] >= config.CLUSTER_SPECIFIC_NAME_MIN_RATIO:
+        if len(self.SpecificTypes) > 0 and self.SpecificTypes[0][1] >= config.cluster_specific_name_min_ratio:
             name = self.SpecificTypes[0][0]
         else:
             name = self.Pattern.value
@@ -87,7 +87,7 @@ def assign_clusters(patterns: List[FoundPattern]) -> List[Tuple[FoundPattern, _C
 
     def add_to_cluster(ms_per_beat: float) -> _ClusterBuilder:
         for c in bpms_non_mixed:
-            if abs(c.OriginalMsPerBeat - ms_per_beat) < config.BPM_CLUSTER_THRESHOLD:
+            if abs(c.OriginalMsPerBeat - ms_per_beat) < config.bpm_cluster_threshold:
                 c.Add(ms_per_beat)
                 return c
         newc = _ClusterBuilder(SumMs=ms_per_beat, OriginalMsPerBeat=ms_per_beat, Count=1, BPM=None)
@@ -153,10 +153,10 @@ def specific_clusters(
         )
 
     has_dw = any(c.Pattern in {CorePattern.Density, CorePattern.Wildcard} for c in out)
-    if has_dw and config.RELEASE_WITH_DW_MULTIPLIER != 1.0:
+    if has_dw and config.release_with_dw_multiplier != 1.0:
         for c in out:
             if any(name == "Release" and ratio > 0.0 for name, ratio in c.SpecificTypes):
-                c.RatingMultiplier *= config.RELEASE_WITH_DW_MULTIPLIER
+                c.RatingMultiplier *= config.release_with_dw_multiplier
 
     return out
 

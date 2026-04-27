@@ -1,6 +1,6 @@
 [project]
 name = "nonebot-plugin-osumania-toolkit"
-version = "1.0.2"
+version = "1.0.3"
 description = "a nonebot plugin with some useful osu!mania utilities"
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
@@ -21,7 +21,6 @@ dependencies = [
     "scipy>=1.7.0",
     "statsmodels>=0.14.0",
     "matplotlib>=3.5.0",
-    "pydantic>=2.0.0",
     "pandas>=2.2.0,<3.0.0",
 ]
 

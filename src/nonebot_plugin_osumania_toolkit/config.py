@@ -199,7 +199,7 @@ class Config(BaseModel):
 
     # CorePattern 级别倍率。
     # 键名必须与 CorePattern.value 一致。
-    CORE_RATING_MULTIPLIER: dict[str, float] = Field(
+    core_rating_multiplier: dict[str, float] = Field(
         default_factory=lambda: {
             "Stream": 1.0 / 3.0,
             "Chordstream": 0.65,
@@ -213,7 +213,7 @@ class Config(BaseModel):
     # 按模式标签分别配置子类倍率。
     # 支持四个标签：RC / LN / HB / Mix。
     # 每个标签都可分别配置 RC 键型子类与 LN 键型子类倍率。
-    SUBTYPE_RATING_MULTIPLIER_BY_MODE: dict[str, dict[str, float]] = Field(
+    subtype_rating_multiplier_by_mode: dict[str, dict[str, float]] = Field(
         default_factory=lambda: {
             "RC": {
                 # Stream
@@ -361,18 +361,18 @@ class Config(BaseModel):
     )
 
     # LN 模式下 RC 核心类缩放系数。
-    RC_CORE_LN_SCALE: float = 0.3
+    rc_core_ln_scale: float = 0.3
 
     # RC 模式下 LN 核心类（Coordination / Density / Wildcard）缩放系数。
-    RC_LN_CORE_SCALE: float = 0.0
+    rc_ln_core_scale: float = 0.0
 
     # 当命中 Density 或 Wildcard 时，对 Release 施加额外倍率。
-    RELEASE_WITH_DW_MULTIPLIER: float = 0.8
+    release_with_dw_multiplier: float = 0.8
 
     # 模式判定阈值。
-    LN_MODE_LOW_THRESHOLD: float = 0.1
-    LN_MODE_HIGH_THRESHOLD: float = 0.9
-    HB_ROW_RATIO_THRESHOLD: float = 0.1
+    ln_mode_low_threshold: float = 0.1
+    ln_mode_high_threshold: float = 0.9
+    hb_row_ratio_threshold: float = 0.1
 
     # -----------------------------
     # 聚类/分类相关阈值
@@ -380,44 +380,44 @@ class Config(BaseModel):
 
     # assign_clusters 时，非 Mixed 模式按 ms/beat 聚类的距离阈值。
     # 值越大：不同节奏更容易合并到同一 BPM 簇。
-    BPM_CLUSTER_THRESHOLD: float = 5.0
+    bpm_cluster_threshold: float = 5.0
 
     # Mixed 判定阈值：同一段内各点 ms/beat 相对均值的允许偏差。
     # 偏差超过该阈值则更容易被判定为 Mixed。
-    PATTERN_STABILITY_THRESHOLD: float = 5.0
+    pattern_stability_threshold: float = 5.0
 
     # “重要簇”筛选阈值：Importance / 第一簇 Importance > 该值。
     # 值越低：参与分类判断的重要簇越多。
-    IMPORTANT_CLUSTER_RATIO: float = 0.5
+    important_cluster_ratio: float = 0.5
 
     # Category 里 Jumpstream/Handstream 混合命名阈值。
     # 当第二名占比 / 第一名占比 > 该值时，名称显示为 Jumpstream/Handstream。
-    CATEGORY_JS_HS_SECONDARY_RATIO: float = 0.4
+    category_js_hs_secondary_ratio: float = 0.4
 
     # SV 分类阈值（ms）。
-    SV_AMOUNT_THRESHOLD: float = 2000.0
+    sv_amount_threshold: float = 2000.0
     # SV 判定：有效速度变化阈值（|sv-1| > 该值）
-    SV_SPEED_EPS: float = 0.05
+    sv_speed_eps: float = 0.05
     # SV 判定：极端 BPM 范围（bpm 过小/过大即认为 SV）
-    SV_EXTREME_BPM_MIN: float = 30.0
-    SV_EXTREME_BPM_MAX: float = 350.0
+    sv_extreme_bpm_min: float = 30.0
+    sv_extreme_bpm_max: float = 350.0
     # SV 判定：相邻 BPM 倍率变化阈值（max/min）
-    SV_EXTREME_BPM_RATIO: float = 3.0
+    sv_extreme_bpm_ratio: float = 3.0
 
     # Cluster.Format 显示子类名称的最低占比。
     # 设为 0.0 表示只要有子类统计就显示第一名子类名；
     # 例如设为 0.4 表示第一名子类至少 40% 才显示，否则显示 CorePattern 名称。
-    CLUSTER_SPECIFIC_NAME_MIN_RATIO: float = 0.0
+    cluster_specific_name_min_ratio: float = 0.0
 
     # 同一窗口内是否保留同一大类的多个子类标签。
     # True：同窗内多个 recogniser 同时命中时全部保留（用于观察“吞标签”现象）。
     # False：保持旧行为，只保留顺序上的第一个命中标签。
-    ENABLE_MULTI_LABEL_SAME_WINDOW: bool = True
+    enable_multi_label_same_window: bool = True
 
     # 三大新增类（Coordination / Density / Wildcard）内部子类匹配顺序。
     # 仅影响“同一大类内部”优先级，不影响大类之间（Stream/Chordstream/Jacks 等）。
     # 可以直接改列表顺序来调试“先命中谁”。
-    COORDINATION_SPECIFIC_ORDER: list[str] = Field(
+    coordination_specific_order: list[str] = Field(
         default_factory=lambda: [
             "Column Lock",
             "Shield",
@@ -425,7 +425,7 @@ class Config(BaseModel):
         ]
     )
 
-    DENSITY_SPECIFIC_ORDER: list[str] = Field(
+    density_specific_order: list[str] = Field(
         default_factory=lambda: [
             "Inverse",
             "JS Density",
@@ -436,7 +436,7 @@ class Config(BaseModel):
         ]
     )
 
-    WILDCARD_SPECIFIC_ORDER: list[str] = Field(
+    wildcard_specific_order: list[str] = Field(
         default_factory=lambda: [
             "Speedy WC",
             "Jacky WC",
@@ -448,31 +448,31 @@ class Config(BaseModel):
     # -----------------------------
 
     # Column Lock 中 jack 速度下限。
-    JACKY_MIN_BPM: float = 90.0
+    jacks_min_bpm: float = 90.0
 
     # Shield 的最大时间间隔上限（按 beat 比例）。
-    SHIELD_MAX_BEAT_RATIO: float = 0.25
+    shield_max_beat_ratio: float = 0.25
 
     # Inverse 判定：尾到头间隔一致性容忍（毫秒）。
-    INVERSE_GAP_TOLERANCE_MS: float = 5.0
+    inverse_gap_tolerance_ms: float = 5.0
 
     # Inverse 判定：窗口内 LN Body 最少覆盖列数。
-    INVERSE_MIN_FILLED_LANES: int = 3
+    inverse_min_filled_lanes: int = 3
 
     # Release：从窗口前多少行里找单尾（len(LNTails)==1）。
-    RELEASE_SCAN_ROWS: int = 4
+    release_scan_rows: int = 4
 
     # Release：至少需要多少个单尾点才能继续判定。
-    RELEASE_MIN_TAIL_ROWS: int = 4
+    release_min_tail_rows: int = 4
 
     # Release：用于判定 roll 的最小点数（给 STREAM_4K_ROLL 的长度）。
-    RELEASE_ROLL_POINTS: int = 2
+    release_roll_points: int = 2
 
     # Release：达到该点数时返回更长匹配长度（更稳定的 Release 段）。
-    RELEASE_FULL_MATCH_ROWS: int = 5
+    release_full_match_rows: int = 5
 
     # Jacky WC：LN 上下文检测窗口。
-    JACKY_CONTEXT_WINDOW: int = 6
+    jacky_context_window: int = 6
 
     # Jacky WC 放宽分支：当有连续 jack 且速度足够快时可判定。
-    JACKY_FALLBACK_MAX_MSPB: float = 185.0
+    jacky_fallback_max_mspb: float = 185.0

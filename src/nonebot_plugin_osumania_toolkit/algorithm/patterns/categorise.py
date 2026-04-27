@@ -32,7 +32,7 @@ def categorise_chart(keys: int, ordered_clusters: List[Cluster], sv_amount: floa
     first_imp = ordered_clusters[0].Importance
     important = []
     for c in ordered_clusters:
-        if c.Importance / first_imp > config.IMPORTANT_CLUSTER_RATIO:
+        if c.Importance / first_imp > config.important_cluster_ratio:
             important.append(c)
         else:
             break
@@ -49,7 +49,7 @@ def categorise_chart(keys: int, ordered_clusters: List[Cluster], sv_amount: floa
     elif len(cluster_1.SpecificTypes) >= 2 and cluster_1.SpecificTypes[0][0] == "Jumpstream" and cluster_1.SpecificTypes[1][0] == "Handstream":
         a1 = cluster_1.SpecificTypes[0][1]
         a2 = cluster_1.SpecificTypes[1][1]
-        name = "Jumpstream/Handstream" if (a2 / a1) > config.CATEGORY_JS_HS_SECONDARY_RATIO else cluster_1.Pattern.value
+        name = "Jumpstream/Handstream" if (a2 / a1) > config.category_js_hs_secondary_ratio else cluster_1.Pattern.value
     else:
         name = cluster_1.Pattern.value
 

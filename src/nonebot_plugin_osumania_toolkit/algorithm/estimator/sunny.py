@@ -2,10 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from ...algorithm.xxy_algorithm import calculate as calculate_sunny
 from ...file.data import sr_intervals_data
-from ..xxy_algorithm import calculate as calculate_sunny
 from .exceptions import NotManiaError, ParseError
-from .rc import estimate_sunny_numeric
 from .shared import resolve_chart_path
 
 
@@ -24,7 +23,7 @@ def est_diff(sr: float, ln_ratio: float, column_count: int) -> str:
             else:
                 rc_diff = "未知RC难度"
 
-        if ln_ratio < 0.1:
+        if ln_ratio < 0.15:
             return f"{rc_diff}"
 
         ln_diff = None
@@ -39,9 +38,6 @@ def est_diff(sr: float, ln_ratio: float, column_count: int) -> str:
                 ln_diff = "> LN 17 high"
             else:
                 ln_diff = "未知LN难度"
-
-        if ln_ratio > 0.9:
-            return f"{ln_diff}"
 
         return f"{rc_diff} || {ln_diff}"
 
@@ -59,7 +55,7 @@ def est_diff(sr: float, ln_ratio: float, column_count: int) -> str:
             else:
                 rc_diff = "未知RC难度"
 
-        if ln_ratio < 0.1:
+        if ln_ratio < 0.15:
             return f"{rc_diff}"
 
         ln_diff = None
@@ -74,9 +70,6 @@ def est_diff(sr: float, ln_ratio: float, column_count: int) -> str:
                 ln_diff = "> LN Finish high"
             else:
                 ln_diff = "未知LN难度"
-
-        if ln_ratio > 0.9:
-            return f"{ln_diff}"
 
         return f"{rc_diff} || {ln_diff}"
 
@@ -94,7 +87,7 @@ def est_diff(sr: float, ln_ratio: float, column_count: int) -> str:
             else:
                 rc_diff = "未知RC难度"
 
-        if ln_ratio < 0.1:
+        if ln_ratio < 0.15:
             return f"{rc_diff}"
 
         ln_diff = None
@@ -110,27 +103,18 @@ def est_diff(sr: float, ln_ratio: float, column_count: int) -> str:
             else:
                 ln_diff = "未知LN难度"
 
-        if ln_ratio > 0.9:
-            return f"{ln_diff}"
-
         return f"{rc_diff} || {ln_diff}"
 
     return "Unsupported"
 
 
-def build_sunny_result(
-    star: float,
-    ln_ratio: float,
-    column_count: int,
-    *,
-    graph: Any = None,
-) -> dict[str, Any]:
+def build_sunny_result(star: float, ln_ratio: float, column_count: int, *, graph: Any = None) -> dict[str, Any]:
     return {
         "star": float(star),
         "lnRatio": float(ln_ratio),
         "columnCount": int(column_count),
         "estDiff": est_diff(float(star), float(ln_ratio), int(column_count)),
-        "numericDifficulty": estimate_sunny_numeric(float(star)),
+        "numericDifficulty": None,
         "numericDifficultyHint": None,
         "graph": graph,
     }
@@ -145,12 +129,10 @@ def estimate_sunny_result(
     path = resolve_chart_path(source)
     result = calculate_sunny(str(path), speed_rate, od_flag, cvt_flag)
 
-    if isinstance(result, (int, float)):
-        if result == -1:
-            raise ParseError("Beatmap parse failed")
-        if result == -2:
-            raise NotManiaError("Beatmap mode is not mania")
-        raise ParseError(f"UnknownCalculateResult: {result}")
+    if result == -1:
+        raise ParseError("Beatmap parse failed")
+    if result == -2:
+        raise NotManiaError("Beatmap mode is not mania")
 
     star, ln_ratio, column_count = result
-    return build_sunny_result(star, ln_ratio, column_count)
+    return build_sunny_result(float(star), float(ln_ratio), int(column_count))
