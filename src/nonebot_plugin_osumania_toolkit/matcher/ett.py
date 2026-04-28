@@ -13,6 +13,7 @@ from ..algorithm.ett import (
     OfficialRunnerError,
     analyze_ett_chart,
     analyze_ett_zip,
+    format_ett_result_text,
 )
 from ..render.ett import render_ett_card
 from ..algorithm.utils import parse_cmd, send_forward_text_messages
@@ -80,8 +81,10 @@ async def handle_ett(bot: Bot, event: MessageEvent):
                         nodes.append(
                             Message(f"{row['file_name']}\n") + MessageSegment.image(image_bytes)
                         )
-                    except Exception as e:
-                        errors.append(f"{row['file_name']}: 图片渲染失败 - {e}")
+                    except Exception:
+                        nodes.append(
+                            f"{row['file_name']}:\n{format_ett_result_text(row)}"
+                        )
 
                 if errors:
                     for err in errors:
@@ -104,7 +107,10 @@ async def handle_ett(bot: Bot, event: MessageEvent):
                     mod_display,
                     CACHE_DIR,
                 )
-                image_bytes = await render_ett_card(TEMPLATE_DIR, row["template"])
+                try:
+                    image_bytes = await render_ett_card(TEMPLATE_DIR, row["template"])
+                except Exception:
+                    await ett.finish(format_ett_result_text(row))
                 await ett.finish(MessageSegment.image(image_bytes))
 
         elif bid is not None:
@@ -119,8 +125,11 @@ async def handle_ett(bot: Bot, event: MessageEvent):
                 mod_display,
                 CACHE_DIR,
             )
-            image_bytes = await render_ett_card(TEMPLATE_DIR, row["template"])
-            await ett.finish(MessageSegment.image(image_bytes))
+            try:
+                image_bytes = await render_ett_card(TEMPLATE_DIR, row["template"])
+                await ett.finish(MessageSegment.image(image_bytes))
+            except Exception:
+                await ett.finish(format_ett_result_text(row))
         else:
             await ett.finish("请回复包含 .osu/.mc/.osz/.mcz 文件的消息，或使用 bid/mania 谱面网址指定谱面。")
 

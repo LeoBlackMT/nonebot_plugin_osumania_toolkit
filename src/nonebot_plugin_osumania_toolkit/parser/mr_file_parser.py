@@ -221,15 +221,15 @@ class mr_file:
 
                 if action not in (1, 2):
                     invalid_actions += 1
-                    logger.warning(f"动作{idx + 1}: 无效 action={action}")
+                    logger.debug(f"动作{idx + 1}: 无效 action={action}")
                     continue
                 if column >= 18:
                     invalid_actions += 1
-                    logger.warning(f"动作{idx + 1}: 无效 column={column}")
+                    logger.debug(f"动作{idx + 1}: 无效 column={column}")
                     continue
                 if time_ms < 0:
                     invalid_actions += 1
-                    logger.warning(f"动作{idx + 1}: 负时间戳 {time_ms}")
+                    logger.debug(f"动作{idx + 1}: 负时间戳 {time_ms}")
                     continue
 
                 parsed_actions.append((time_ms, action, column))

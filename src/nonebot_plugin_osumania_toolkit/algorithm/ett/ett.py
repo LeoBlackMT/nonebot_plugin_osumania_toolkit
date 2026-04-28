@@ -244,3 +244,20 @@ async def analyze_ett_zip(
     finally:
         if temp_dir.exists():
             shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def format_ett_result_text(row: dict[str, Any]) -> str:
+    """纯文字兜底：将 ETT 分析结果格式化为可读文本。"""
+    t = row.get("template", {})
+    lines = [
+        f"ETT 分析: {t.get('status_text', 'Unknown')}",
+        f"Overall: {t.get('overall_value', '-')}",
+    ]
+    meta = t.get("ett_meta_lines", []) or []
+    lines.extend(meta)
+    skillsets = t.get("skillsets", []) or []
+    if skillsets:
+        lines.append("Skillsets:")
+        for s in skillsets:
+            lines.append(f"  {s['label']}: {s['value_text']}")
+    return "\n".join(lines)

@@ -5,7 +5,12 @@ from nonebot import on_command
 from nonebot.adapters.onebot.v11 import Bot, Message, MessageEvent, MessageSegment
 from nonebot.exception import FinishedException
 
-from ..algorithm.mapview import analyze_mapview_chart, analyze_mapview_zip, format_parse_error_for_user
+from ..algorithm.mapview import (
+    analyze_mapview_chart,
+    analyze_mapview_zip,
+    format_mapview_result_text,
+    format_parse_error_for_user,
+)
 from ..algorithm.pattern import PatternNotManiaError, PatternParseError
 from ..algorithm.estimator.exceptions import ParseError, NotManiaError
 from ..algorithm.utils import parse_cmd, send_forward_text_messages
@@ -73,8 +78,10 @@ async def handle_mapview(bot: Bot, event: MessageEvent):
                         nodes.append(
                             Message(f"{row['file_name']}\n") + MessageSegment.image(image_bytes)
                         )
-                    except Exception as e:
-                        errors.append(f"{row['file_name']}: 图片渲染失败 - {e}")
+                    except Exception:
+                        nodes.append(
+                            f"{row['file_name']}:\n{format_mapview_result_text(row)}"
+                        )
 
                 if errors:
                     for err in errors:
@@ -98,8 +105,11 @@ async def handle_mapview(bot: Bot, event: MessageEvent):
                     mod_display,
                     CACHE_DIR,
                 )
-                image_bytes = await render_analysis_card(TEMPLATE_DIR, row["template"])
-                await mapview.finish(MessageSegment.image(image_bytes))
+                try:
+                    image_bytes = await render_analysis_card(TEMPLATE_DIR, row["template"])
+                    await mapview.finish(MessageSegment.image(image_bytes))
+                except Exception:
+                    await mapview.finish(format_mapview_result_text(row))
 
         elif bid is not None:
             tmp_file, file_name = await download_file_by_id(CACHE_DIR, bid)
@@ -114,8 +124,11 @@ async def handle_mapview(bot: Bot, event: MessageEvent):
                 mod_display,
                 CACHE_DIR,
             )
-            image_bytes = await render_analysis_card(TEMPLATE_DIR, row["template"])
-            await mapview.finish(MessageSegment.image(image_bytes))
+            try:
+                image_bytes = await render_analysis_card(TEMPLATE_DIR, row["template"])
+                await mapview.finish(MessageSegment.image(image_bytes))
+            except Exception:
+                await mapview.finish(format_mapview_result_text(row))
         else:
             await mapview.finish("请回复包含 .osu/.mc/.osz/.mcz 文件的消息，或使用 bid/mania 谱面网址指定谱面。")
 

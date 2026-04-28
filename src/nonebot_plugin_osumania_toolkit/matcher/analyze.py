@@ -19,19 +19,20 @@ from ..api.download import download_file, get_file_url
 from ..api.osu import download_file_by_id
 from ..file.cleanup import cleanup_temp_file
 from ..algorithm.utils import parse_bid_or_url, parse_cmd, is_mc_file
-from ..algorithm.detector import run_analyze_cheating
+from ..algorithm.detector import run_analyze_cheating, format_analyze_result
 from ..algorithm.conversion import convert_mr_to_osr, convert_mc_to_osu
 
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-analyze = on_command("analyze", aliases={"分析"}, block=True)
+analyze = on_command("analyze", aliases={"分析", "analyse"}, block=True)
 
 @analyze.handle()
 async def handle_first(bot: Bot, event: MessageEvent, state: T_State):
     
     state["status"] = "init"
-    
+
     cmd_text = event.get_plaintext().strip()
+    state["show_reason"] = "-reason" in cmd_text.lower()
     _speed_rate, _od_flag, _cvt_flag, bid, _mod_display, cmd_err_msg = parse_cmd(cmd_text)
     if cmd_err_msg:
         state["status"] = "Fail"
@@ -134,20 +135,9 @@ async def handle_first(bot: Bot, event: MessageEvent, state: T_State):
              
             output_path = await run_plot_comprehensive(str(CACHE_DIR), osr, osu)
             result = await run_analyze_cheating(osr, osu)
-            reason_str = "\n".join(result["reasons"]) if result["reasons"] else "无分析结果。"
-            if result["cheat"] or result["sus"]:
-                if result["cheat"]:
-                    state["status"] = "Finish"
-                    await analyze.send(MessageSegment.image(f"file://{output_path}"))
-                    await analyze.finish(f"<!>此成绩检测到作弊：\n{reason_str}\n仅供参考，请结合其他信息进行判断。")
-                else:
-                    state["status"] = "Finish"
-                    await analyze.send(MessageSegment.image(f"file://{output_path}"))
-                    await analyze.finish(f"<*>此成绩检测到可疑：\n{reason_str}\n仅供参考，请结合其他信息进行判断。")
-            else:
-                state["status"] = "Finish"
-                await analyze.send(MessageSegment.image(f"file://{output_path}"))
-                await analyze.finish(f"分析完成: \n{reason_str}\n仅供参考，请结合其他信息进行判断。")
+            state["status"] = "Finish"
+            await analyze.send(MessageSegment.image(f"file://{output_path}"))
+            await analyze.finish(format_analyze_result(result, state.get("show_reason", False)))
         except FinishedException:
             pass    
         except Exception as e:
@@ -206,17 +196,8 @@ async def handle_file(bot: Bot, state: T_State, user_msg: Message = Arg("user_fi
             try:
                 output_path = await run_plot_comprehensive(str(CACHE_DIR), osr)
                 result = await run_analyze_cheating(osr)
-                reason_str = "\n".join(result["reasons"]) if result["reasons"] else "无分析结果。"
-                if result["cheat"] or result["sus"]:
-                    if result["cheat"]:
-                        await analyze.send(MessageSegment.image(f"file://{output_path}"))
-                        await analyze.finish(f"<!>此成绩检测到作弊：\n{reason_str}\n仅供参考，请结合其他信息进行判断。")
-                    else:
-                        await analyze.send(MessageSegment.image(f"file://{output_path}"))
-                        await analyze.finish(f"<*>此成绩检测到可疑：\n{reason_str}\n仅供参考，请结合其他信息进行判断。")
-                else:
-                    await analyze.send(MessageSegment.image(f"file://{output_path}"))
-                    await analyze.finish(f"分析完成: \n{reason_str}\n仅供参考，请结合其他信息进行判断。")
+                await analyze.send(MessageSegment.image(f"file://{output_path}"))
+                await analyze.finish(format_analyze_result(result, state.get("show_reason", False)))
             except FinishedException:
                 pass
             except Exception as e:
@@ -254,17 +235,8 @@ async def handle_file(bot: Bot, state: T_State, user_msg: Message = Arg("user_fi
                 await analyze.send("已收到谱面链接，处理中，请稍候...")
                 output_path = await run_plot_comprehensive(str(CACHE_DIR), osr, osu)
                 result = await run_analyze_cheating(osr, osu)
-                reason_str = "\n".join(result["reasons"]) if result["reasons"] else "无分析结果。"
-                if result["cheat"] or result["sus"]:
-                    if result["cheat"]:
-                        await analyze.send(MessageSegment.image(f"file://{output_path}"))
-                        await analyze.finish(f"<!>此成绩检测到作弊：\n{reason_str}\n仅供参考，请结合其他信息进行判断。")
-                    else:
-                        await analyze.send(MessageSegment.image(f"file://{output_path}"))
-                        await analyze.finish(f"<*>此成绩检测到可疑：\n{reason_str}\n仅供参考，请结合其他信息进行判断。")
-                else:
-                    await analyze.send(MessageSegment.image(f"file://{output_path}"))
-                    await analyze.finish(f"分析完成: \n{reason_str}\n仅供参考，请结合其他信息进行判断。")
+                await analyze.send(MessageSegment.image(f"file://{output_path}"))
+                await analyze.finish(format_analyze_result(result, state.get("show_reason", False)))
             except FinishedException:
                 pass
             except Exception as e:
@@ -326,17 +298,8 @@ async def handle_file(bot: Bot, state: T_State, user_msg: Message = Arg("user_fi
             await analyze.send(f"已收到文件，请稍候...")
             output_path = await run_plot_comprehensive(str(CACHE_DIR), osr, osu)
             result = await run_analyze_cheating(osr, osu)
-            reason_str = "\n".join(result["reasons"]) if result["reasons"] else "无分析结果。"
-            if result["cheat"] or result["sus"]:
-                if result["cheat"]:
-                    await analyze.send(MessageSegment.image(f"file://{output_path}"))
-                    await analyze.finish(f"<!>此成绩检测到作弊：\n{reason_str}\n仅供参考，请结合其他信息进行判断。")
-                else:
-                    await analyze.send(MessageSegment.image(f"file://{output_path}"))
-                    await analyze.finish(f"<*>此成绩检测到可疑：\n{reason_str}\n仅供参考，请结合其他信息进行判断。")
-            else:
-                await analyze.send(MessageSegment.image(f"file://{output_path}"))
-                await analyze.finish(f"分析完成: \n{reason_str}\n仅供参考，请结合其他信息进行判断。")
+            await analyze.send(MessageSegment.image(f"file://{output_path}"))
+            await analyze.finish(format_analyze_result(result, state.get("show_reason", False)))
         except FinishedException:
             pass
         except Exception as e:

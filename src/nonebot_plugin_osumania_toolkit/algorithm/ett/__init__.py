@@ -13,13 +13,14 @@ __all__ = [
 
 
 def __getattr__(name: str):
-    if name in {"ETTNotManiaError", "ETTParseError", "ETTUnsupportedKeyError", "analyze_ett_chart", "analyze_ett_zip"}:
+    if name in {"ETTNotManiaError", "ETTParseError", "ETTUnsupportedKeyError", "analyze_ett_chart", "analyze_ett_zip", "format_ett_result_text"}:
         from .ett import (  # imported lazily to keep estimator imports lightweight
             ETTNotManiaError,
             ETTParseError,
             ETTUnsupportedKeyError,
             analyze_ett_chart,
             analyze_ett_zip,
+            format_ett_result_text,
         )
 
         globals().update(
@@ -29,6 +30,7 @@ def __getattr__(name: str):
                 "ETTUnsupportedKeyError": ETTUnsupportedKeyError,
                 "analyze_ett_chart": analyze_ett_chart,
                 "analyze_ett_zip": analyze_ett_zip,
+                "format_ett_result_text": format_ett_result_text,
             }
         )
         return globals()[name]
